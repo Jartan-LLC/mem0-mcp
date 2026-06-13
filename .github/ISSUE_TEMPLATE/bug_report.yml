@@ -1,0 +1,63 @@
+name: Bug Report
+description: Report a bug
+labels: ["bug"]
+body:
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the issue.
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: "### Optional — helps us reproduce faster"
+
+  - type: dropdown
+    id: reproducibility
+    attributes:
+      label: Reproducibility
+      options:
+        - Unknown
+        - Always
+        - Sometimes
+        - Once
+
+  - type: input
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Link to a minimal reproduction (repo, playground, etc.)
+      placeholder: https://github.com/...
+
+  - type: input
+    id: environment
+    attributes:
+      label: Version / Environment
+      placeholder: e.g., v1.2.0, macOS 15, Python 3.12
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Screenshots
+      description: Paste error output or stack traces here. Attach screenshots in a comment after filing.
+      render: text

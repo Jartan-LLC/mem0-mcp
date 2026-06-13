@@ -1,0 +1,64 @@
+{
+  "image": "mcr.microsoft.com/devcontainers/base:debian-12",
+  "mounts": [
+    "source=claude-data,target=/home/vscode/.claude,type=volume"
+  ],
+  "features": {
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.13"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    },
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+      "moby": false
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/desktop-lite:1": {
+      "password": "changeme",
+      "webPort": "6080"
+    }
+  },
+  "containerEnv": {
+    "HOST_PROJECT_PATH": "${localWorkspaceFolder}",
+    "CONTAINER_WORKSPACE_FOLDER": "${containerWorkspaceFolder}"
+  },
+  "forwardPorts": [6080],
+  "portsAttributes": {
+    "6080": {
+      "label": "Desktop"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.debugpy",
+        "charliermarsh.ruff",
+        "GitHub.copilot",
+        "GitHub.vscode-github-actions",
+        "GitHub.vscode-pull-request-github",
+        "ms-azuretools.vscode-docker",
+        "esbenp.prettier-vscode",
+        "eamodio.gitlens"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "python.analysis.typeCheckingMode": "basic",
+        "python.analysis.autoFormatStrings": true,
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.codeActionsOnSave": {
+            "source.organizeImports.ruff": "always",
+            "source.fixAll.ruff": "always"
+          }
+        }
+      }
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postStartCommand": "sudo chmod 666 /var/run/docker-host.sock 2>/dev/null || true"
+}

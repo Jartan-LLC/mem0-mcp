@@ -1,0 +1,44 @@
+# Normalize line endings
+* text=auto
+
+# Explicit text files
+*.md text diff=markdown
+*.py text diff=python
+*.js text
+*.ts text
+*.go text diff=golang
+*.rs text diff=rust
+*.rb text diff=ruby
+*.java text diff=java
+*.kt text diff=kotlin
+*.cpp text diff=cpp
+*.c text diff=cpp
+*.h text diff=cpp
+*.cs text diff=csharp
+*.php text diff=php
+*.pl text diff=perl
+*.ex text diff=elixir
+*.exs text diff=elixir
+*.json text
+*.yml text
+*.yaml text
+*.css text diff=css
+*.html text diff=html
+*.jsx text
+*.tsx text
+*.astro text
+*.vue text
+*.svelte text
+*.sh text eol=lf diff=bash
+
+# Binary files
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+
+# Lock files — treat as binary for cleaner diffs
+*-lock.json binary
+*.lock binary
