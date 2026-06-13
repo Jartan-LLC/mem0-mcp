@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # TODO: Add your lint/format commands
+      # Example (Python):
+      # - uses: actions/setup-python@v5
+      #   with:
+      #     python-version: "3.13"
+      # - run: pip install ruff && ruff check . && ruff format --check .
+      #
+      # Example (Node):
+      # - uses: actions/setup-node@v4
+      # - run: npm ci && npm run lint
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # TODO: Add your test commands
+      # Example (Python):
+      # - uses: actions/setup-python@v5
+      #   with:
+      #     python-version: "3.13"
+      # - run: pip install -e '.[dev]' && pytest
+      #
+      # Example (Node):
+      # - uses: actions/setup-node@v4
+      # - run: npm ci && npm test
+
+  check:
+    if: always()
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          results=("${{ needs.lint.result }}" "${{ needs.test.result }}")
+          for r in "${results[@]}"; do
+            if [[ "$r" != "success" && "$r" != "skipped" ]]; then
+              echo "Check failed: $r"
+              exit 1
+            fi
+          done

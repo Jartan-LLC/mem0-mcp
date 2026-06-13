@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and Support
+    url: https://github.com/ORG/REPO/discussions/categories/q-a
+    about: The issue tracker is for bugs and feature requests. Ask usage questions in Discussions.
+  - name: Security Vulnerability
+    url: https://github.com/ORG/REPO/security/advisories/new
+    about: Report security vulnerabilities privately. Do not open a public issue for security bugs.
