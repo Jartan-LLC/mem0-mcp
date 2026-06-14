@@ -21,8 +21,10 @@ OTHER = "bob"
 
 
 @pytest.fixture
-def backend():
-    return Mem0Backend(BASE, KEY)
+async def backend():
+    b = Mem0Backend(BASE, KEY)
+    yield b
+    await b.close()
 
 
 MEMORY_RESPONSE = {

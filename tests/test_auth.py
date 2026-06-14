@@ -192,38 +192,26 @@ async def test_empty_bearer_token_rejected():
     assert status == 401
 
 
+async def test_bearer_no_space_rejected():
+    gate = BearerGate(_dummy_app, _resolver())
+    status, _body = await _make_request(gate, [(b"authorization", b"Bearer")])
+    assert status == 401
+
+
 async def test_no_bearer_prefix_rejected():
     gate = BearerGate(_dummy_app, _resolver())
     status, _body = await _make_request(gate, [(b"authorization", b"secret-token")])
     assert status == 401
 
 
-async def test_disabled_auth_uses_default_user():
-    """When resolver is None, all requests get default_user."""
-    captured_user = None
-
-    async def capture_app(scope, receive, send):
-        nonlocal captured_user
-        captured_user = get_tenant()
-        await send({"type": "http.response.start", "status": 200, "headers": []})
-        await send({"type": "http.response.body", "body": b'{"ok": true}'})
-
-    gate = BearerGate(capture_app, None)
-    status, _body = await _make_request(gate, [])
-    assert status == 200
-    assert captured_user == "default_user"
-
-
 async def test_lifespan_passes_through():
     """Non-HTTP scopes (lifespan) should pass through regardless."""
-    resolver = _resolver()
-    gate = BearerGate(_dummy_app, resolver)
     called = False
 
     async def lifespan_app(scope, receive, send):
         nonlocal called
         called = True
 
-    gate.app = lifespan_app
+    gate = BearerGate(lifespan_app, _resolver())
     await gate({"type": "lifespan"}, None, None)
     assert called

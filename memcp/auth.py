@@ -61,7 +61,7 @@ class StaticResolver:
         # Iterate all tokens without early return — constant-time to prevent timing oracle
         matched: str | None = None
         for known_token, user_id in self._mapping.items():
-            if hmac.compare_digest(token, known_token):
+            if hmac.compare_digest(token.encode(), known_token.encode()):
                 matched = user_id
         return matched
 
@@ -121,7 +121,7 @@ class BearerGate:
         provided = headers.get(b"authorization", b"").decode("utf-8", errors="replace")
 
         if not provided.startswith("Bearer "):
-            logger.warning("Rejected request: missing Bearer prefix")
+            logger.warning("Rejected request: missing Bearer prefix (path=%s)", scope.get("path"))
             await self._send_401(send)
             return
 
@@ -129,7 +129,7 @@ class BearerGate:
         user_id = await self.resolver.resolve(bearer_token)
 
         if user_id is None:
-            logger.warning("Rejected request: invalid token")
+            logger.warning("Rejected request: invalid token (path=%s)", scope.get("path"))
             await self._send_401(send)
             return
 

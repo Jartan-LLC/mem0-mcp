@@ -27,10 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI pipeline (ruff, pyright, pytest, Docker build + health check)
 - PyPI + Docker image publish workflows
 - Test suite: conformance, tool layer, auth, mock adapter, tenant isolation, integration
-
-### Changed
-- Replaced single `SHIM_AUTH_TOKEN` + `MEM0_USER_ID` with `MEMCP_AUTH_TOKENS`
-- Server config env vars (host, port, log, auth) prefixed with `MEMCP_`; backend vars retain `MEM0_` prefix
+- Backend selection via `MEMCP_BACKEND` (mem0, in_memory)
+- Server config: `MEMCP_HOST`, `MEMCP_PORT`, `MEMCP_LOG_LEVEL`, `MEMCP_LOG_FORMAT`
 
 ### Security
 - Constant-time token comparison (hmac.compare_digest)
