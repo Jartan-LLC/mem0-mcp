@@ -66,7 +66,11 @@ def create_app(config: Config) -> tuple[Any, MemoryBackend]:
     if config.memcp_auth_tokens:
         resolver = StaticResolver.from_env(config.memcp_auth_tokens)
 
-    mcp_app = BearerGate(mcp.streamable_http_app(), resolver)
+    # Initialize the MCP app (creates session manager)
+    mcp_starlette = mcp.streamable_http_app()
+    session_manager = mcp.session_manager
+
+    mcp_app = BearerGate(mcp_starlette, resolver)
 
     async def health(request: Request) -> JSONResponse:
         status = await backend.health()
@@ -78,8 +82,11 @@ def create_app(config: Config) -> tuple[Any, MemoryBackend]:
 
     @asynccontextmanager
     async def lifespan(app: Starlette) -> AsyncGenerator[None]:
-        yield
-        await backend.close()
+        async with session_manager.run():
+            try:
+                yield
+            finally:
+                await backend.close()
 
     app = Starlette(
         routes=[
