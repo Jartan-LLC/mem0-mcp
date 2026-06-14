@@ -116,9 +116,10 @@ class BearerGate:
             return
 
         headers = dict(scope.get("headers") or [])
-        provided = headers.get(b"authorization", b"").decode()
+        provided = headers.get(b"authorization", b"").decode("utf-8", errors="replace")
 
         if not provided.startswith("Bearer "):
+            logger.warning("Rejected request: missing Bearer prefix")
             await self._send_401(send)
             return
 
@@ -126,6 +127,7 @@ class BearerGate:
         user_id = await self.resolver.resolve(bearer_token)
 
         if user_id is None:
+            logger.warning("Rejected request: invalid token")
             await self._send_401(send)
             return
 

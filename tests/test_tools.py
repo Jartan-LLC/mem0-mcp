@@ -642,6 +642,38 @@ async def test_negative_limit_rejected(mcp_with_tools):
     assert result["error"]["code"] == "validation_error"
 
 
+async def test_limit_upper_bound_rejected(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("search_memory", query="test", limit=1001)
+    assert result["error"]["code"] == "validation_error"
+    assert "maximum" in result["error"]["message"]
+
+
+async def test_whitespace_content_rejected(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("add_memory", content="   ")
+    assert result["error"]["code"] == "validation_error"
+
+
+async def test_whitespace_query_rejected(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("search_memory", query="   ")
+    assert result["error"]["code"] == "validation_error"
+
+
+async def test_threshold_out_of_range(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("search_memory", query="test", threshold=1.5)
+    assert result["error"]["code"] == "validation_error"
+    assert "threshold" in result["error"]["message"]
+
+
+async def test_threshold_negative_rejected(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("search_memory", query="test", threshold=-0.1)
+    assert result["error"]["code"] == "validation_error"
+
+
 # ---------------------------------------------------------------------------
 # export_memories
 # ---------------------------------------------------------------------------
@@ -683,3 +715,11 @@ async def test_export_memories_tenant_isolation(mcp_with_tools):
     assert "their data" in contents
     assert "my data" not in contents
     reset_tenant(tok)
+
+
+async def test_export_memories_backend_error(mcp_with_tools):
+    mcp, backend = mcp_with_tools
+    _patch_raise(backend, "list_memories", 503)
+    result = await mcp.call("export_memories")
+    assert result["error"]["code"] == "backend_error"
+    assert result["error"]["retry"] is True

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from memcp.auth import _tenant_var, set_tenant
+from memcp.auth import set_tenant
 from memcp.backend.in_memory import InMemoryBackend
 from memcp.config import Config
 
@@ -29,7 +29,7 @@ def tenant_context():
     set_tenant("test_user")
     yield
     # Force-clear regardless of what happened mid-test
-    _tenant_var.set("test_user")
+    set_tenant("test_user")
 
 
 USER_A = "alice"

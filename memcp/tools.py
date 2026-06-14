@@ -105,6 +105,8 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
         try:
             validate_query(query)
             validate_limit(limit)
+            if not (0.0 <= threshold <= 1.0):
+                raise ValueError("threshold must be between 0.0 and 1.0")
         except ValueError as e:
             return canonical_error("validation_error", str(e))
         user_id = get_tenant()
@@ -379,8 +381,8 @@ def _validate_scope(scope: dict[str, Any] | None, allowed_keys: set[str]) -> dic
     if not scope:
         return scope
     if "user_id" in scope:
-        logger.warning("Stripped user_id from scope dict; remaining keys: %s", list(scope.keys()))
         scope = {k: v for k, v in scope.items() if k != "user_id"}
+        logger.warning("Stripped user_id from scope dict; remaining keys: %s", list(scope.keys()))
     reject_nested_filters(scope)
     if len(scope) > MAX_SCOPE_KEYS:
         raise _InvalidScope(

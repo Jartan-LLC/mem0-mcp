@@ -115,6 +115,16 @@ def test_static_resolver_from_env_invalid():
         StaticResolver.from_env("no-colon-here")
 
 
+def test_static_resolver_from_env_empty_token():
+    with pytest.raises(ValueError, match="Empty token or user_id"):
+        StaticResolver.from_env(":alice")
+
+
+def test_static_resolver_from_env_empty_user():
+    with pytest.raises(ValueError, match="Empty token or user_id"):
+        StaticResolver.from_env("tok:")
+
+
 def test_static_resolver_from_env_empty():
     with pytest.raises(ValueError, match="no valid mappings"):
         StaticResolver.from_env("")

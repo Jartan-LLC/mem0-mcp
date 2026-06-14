@@ -32,14 +32,14 @@ def validate_memory_id(memory_id: str) -> str:
 
 
 def validate_content(content: str) -> None:
-    if not content:
+    if not content or not content.strip():
         raise ValueError("content must not be empty")
     if len(content) > MAX_CONTENT_LENGTH:
         raise ValueError(f"content exceeds maximum length of {MAX_CONTENT_LENGTH} chars")
 
 
 def validate_query(query: str) -> None:
-    if not query:
+    if not query or not query.strip():
         raise ValueError("query must not be empty")
     if len(query) > MAX_QUERY_LENGTH:
         raise ValueError(f"query exceeds maximum length of {MAX_QUERY_LENGTH} chars")
