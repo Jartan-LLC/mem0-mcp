@@ -44,6 +44,14 @@ pip install -e ".[dev]"
 python -m memcp
 ```
 
+### Quick start without mem0
+
+```bash
+MEMCP_BACKEND=in_memory python -m memcp
+```
+
+No external dependencies — memories are stored in-process (lost on restart). Useful for testing and development.
+
 ### Connect from Claude Code
 
 ```json
@@ -101,9 +109,24 @@ python -c "import memcp"
 pytest -x
 ```
 
-## Pre-alpha
+## Known Limitations
 
-API will break. Not ready for production use.
+**mem0 backend (upstream constraints):**
+- Nested boolean filters (AND/OR/NOT) return 502 — use flat scope keys
+- List endpoint does not paginate server-side — full dataset loaded per request
+- List endpoint does not filter by metadata
+- Entities endpoint does not filter by user — post-filtered client-side
+- Single-ID endpoints are globally scoped — ownership verified via fetch-then-verify
+
+**General:**
+- No date/time-based filtering on search or list
+- In-memory backend loses all data on restart
+- No rate limiting (configure at reverse proxy layer)
+- `delete_all_memories` deletes by scope structure, not content match
+
+## Status
+
+v0.1.0 — API may change before v1.0. Suitable for development and early adoption.
 
 ## License
 
