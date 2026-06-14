@@ -1,6 +1,6 @@
 # memcp
 
-Backend-agnostic, multi-tenant MCP memory server. Python, FastMCP, deployed behind Traefik.
+Backend-agnostic, multi-tenant MCP memory server. Python, FastMCP, deployed behind a reverse proxy.
 
 ## Rules
 
@@ -41,6 +41,7 @@ Project conventions live in `.claude/skills/`. Check the relevant skill when wor
 - **claude-config** — agents vs skills vs commands
 - **docs-patterns** — writing style, structure, brevity
 - **github-conventions** — branches, commits, issue/PR templates
+- **llm-council** — multi-advisor decision council (Karpathy-style)
 - **logging-patterns** — log levels, formatting, structured output
 - **testing-patterns** — integration tests, fixture composition, canary markers
 

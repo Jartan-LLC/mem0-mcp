@@ -23,6 +23,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 TEST_USER = f"memcp_test_{uuid.uuid4().hex[:8]}"
+SECOND_USER = f"memcp_test2_{uuid.uuid4().hex[:8]}"
 
 
 @pytest.fixture
@@ -30,11 +31,12 @@ async def mem0() -> Mem0Backend:
     assert MEM0_API_BASE and MEM0_API_KEY
     backend = Mem0Backend(MEM0_API_BASE, MEM0_API_KEY)
     yield backend
-    # Cleanup: delete all test user memories
-    with contextlib.suppress(Exception):
-        listing = await backend.list_memories(TEST_USER)
-        for m in listing.memories:
-            await backend.delete(TEST_USER, m.id)
+    # Cleanup: delete all test user memories for both users
+    for uid in (TEST_USER, SECOND_USER):
+        with contextlib.suppress(Exception):
+            listing = await backend.list_memories(uid)
+            for m in listing.memories:
+                await backend.delete(uid, m.id)
     await backend.close()
 
 
@@ -146,9 +148,6 @@ async def test_scope_keys(mem0: Mem0Backend):
 # Tenant isolation
 # ---------------------------------------------------------------------------
 
-SECOND_USER = f"memcp_test2_{uuid.uuid4().hex[:8]}"
-
-
 async def test_entities_tenant_isolation(mem0: Mem0Backend):
     """entities() should only return the requesting user's data."""
     await mem0.add(TEST_USER, "user A entity test", infer=False)
@@ -157,16 +156,14 @@ async def test_entities_tenant_isolation(mem0: Mem0Backend):
     result_a = await mem0.entities(TEST_USER)
     result_b = await mem0.entities(SECOND_USER)
 
+    assert len(result_a.entities) >= 1, "User A should have at least one entity"
+    assert len(result_b.entities) >= 1, "User B should have at least one entity"
+
     a_ids = {e.get("id") for e in result_a.entities}
     b_ids = {e.get("id") for e in result_b.entities}
 
     assert SECOND_USER not in a_ids, "User A sees User B's entities"
     assert TEST_USER not in b_ids, "User B sees User A's entities"
-
-    # Cleanup
-    listing_b = await mem0.list_memories(SECOND_USER)
-    for m in listing_b.memories:
-        await mem0.delete(SECOND_USER, m.id)
 
 
 # ---------------------------------------------------------------------------

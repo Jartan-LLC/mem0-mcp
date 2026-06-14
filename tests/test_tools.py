@@ -357,13 +357,6 @@ async def test_add_memory_empty_extraction(mcp_with_tools):
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture
-def error_mcp(config: Config, backend: InMemoryBackend) -> tuple[FakeMCP, InMemoryBackend]:
-    """MCP with tools wired to a backend we can patch."""
-    mcp = FakeMCP()
-    register_tools(mcp, backend, config)
-    return mcp, backend
-
 
 def _patch_raise(backend, method_name: str, status: int):
     """Patch a backend method to raise MemoryAPIError."""
@@ -375,55 +368,89 @@ def _patch_raise(backend, method_name: str, status: int):
     setattr(backend, method_name, raiser)
 
 
-async def test_backend_error_503_is_retryable(error_mcp):
-    mcp, backend = error_mcp
+async def test_backend_error_503_is_retryable(mcp_with_tools):
+    mcp, backend = mcp_with_tools
     _patch_raise(backend, "search", 503)
     result = await mcp.call("search_memory", query="test")
     assert result["error"]["code"] == "backend_error"
     assert result["error"]["retry"] is True
 
 
-async def test_backend_error_400_not_retryable(error_mcp):
-    mcp, backend = error_mcp
+async def test_backend_error_400_not_retryable(mcp_with_tools):
+    mcp, backend = mcp_with_tools
     _patch_raise(backend, "search", 400)
     result = await mcp.call("search_memory", query="test")
     assert result["error"]["code"] == "backend_error"
     assert result["error"]["retry"] is False
 
 
-async def test_backend_error_on_add(error_mcp):
-    mcp, backend = error_mcp
+async def test_backend_error_on_add(mcp_with_tools):
+    mcp, backend = mcp_with_tools
     _patch_raise(backend, "add", 503)
     result = await mcp.call("add_memory", content="test")
     assert result["error"]["code"] == "backend_error"
     assert result["error"]["retry"] is True
 
 
-async def test_backend_error_on_delete(error_mcp):
-    mcp, backend = error_mcp
+async def test_backend_error_on_delete(mcp_with_tools):
+    mcp, backend = mcp_with_tools
     _patch_raise(backend, "delete", 502)
     result = await mcp.call("delete_memory", memory_id="some-valid-id")
-    assert result["error"]["code"] == "not_found"
+    assert result["error"]["code"] == "backend_error"
+    assert result["error"]["retry"] is True
 
 
-async def test_backend_error_on_delete_4xx(error_mcp):
-    mcp, backend = error_mcp
+async def test_backend_error_on_delete_4xx(mcp_with_tools):
+    mcp, backend = mcp_with_tools
     _patch_raise(backend, "delete", 403)
     result = await mcp.call("delete_memory", memory_id="some-valid-id")
     assert result["error"]["code"] == "backend_error"
     assert result["error"]["retry"] is False
 
 
-async def test_backend_error_on_get(error_mcp):
-    mcp, backend = error_mcp
+async def test_backend_error_on_get(mcp_with_tools):
+    mcp, backend = mcp_with_tools
     _patch_raise(backend, "get", 503)
     result = await mcp.call("get_memory", memory_id="some-valid-id")
-    assert result["error"]["code"] == "not_found"
+    assert result["error"]["code"] == "backend_error"
+    assert result["error"]["retry"] is True
 
 
-async def test_backend_error_on_delete_all(error_mcp):
-    mcp, backend = error_mcp
+async def test_backend_error_on_delete_all(mcp_with_tools):
+    mcp, backend = mcp_with_tools
     _patch_raise(backend, "delete_all", 500)
     result = await mcp.call("delete_all_memories", scope={"agent_id": "x"})
+    assert result["error"]["code"] == "backend_error"
+    assert result["error"]["retry"] is True
+
+
+async def test_backend_error_on_list_memories(mcp_with_tools):
+    mcp, backend = mcp_with_tools
+    _patch_raise(backend, "list_memories", 503)
+    result = await mcp.call("list_memories")
+    assert result["error"]["code"] == "backend_error"
+    assert result["error"]["retry"] is True
+
+
+async def test_backend_error_on_update(mcp_with_tools):
+    mcp, backend = mcp_with_tools
+    _patch_raise(backend, "update", 502)
+    result = await mcp.call("update_memory", memory_id="some-valid-id", content="x")
+    assert result["error"]["code"] == "backend_error"
+    assert result["error"]["retry"] is True
+
+
+async def test_backend_error_on_history(mcp_with_tools):
+    mcp, backend = mcp_with_tools
+    _patch_raise(backend, "history", 500)
+    result = await mcp.call("memory_history", memory_id="some-valid-id")
+    assert result["error"]["code"] == "backend_error"
+    assert result["error"]["retry"] is True
+
+
+async def test_backend_error_on_entities(mcp_with_tools):
+    mcp, backend = mcp_with_tools
+    _patch_raise(backend, "entities", 503)
+    result = await mcp.call("memory_entities")
     assert result["error"]["code"] == "backend_error"
     assert result["error"]["retry"] is True

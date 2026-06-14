@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -17,6 +17,11 @@ class Config(BaseSettings):
     mem0_api_key: str
 
     shim_auth_token: str | None = None
+
+    @field_validator("shim_auth_token", mode="before")
+    @classmethod
+    def _empty_token_is_none(cls, v: str | None) -> str | None:
+        return v if v else None
 
     mem0_user_id: str = "default_user"
 

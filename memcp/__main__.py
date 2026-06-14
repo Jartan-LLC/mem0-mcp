@@ -24,7 +24,7 @@ def main() -> None:
     app, backend = create_app(config)
 
     try:
-        uvicorn.run(app, host=config.host, port=config.port)
+        uvicorn.run(app, host=config.host, port=config.port, log_config=None)
     finally:
         asyncio.run(backend.close())
 

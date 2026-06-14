@@ -90,7 +90,7 @@ def paginate(memories: list[Memory], cursor: str | None, limit: int) -> ListResu
         try:
             start = int(cursor)
         except ValueError:
-            raise MemoryAPIError(400, f"Invalid cursor: {cursor}") from None
+            raise ValueError(f"Invalid cursor: {cursor}") from None
     else:
         start = 0
     page = memories[start : start + limit]

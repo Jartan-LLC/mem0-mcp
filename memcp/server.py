@@ -5,8 +5,13 @@ from __future__ import annotations
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from starlette.routing import Mount, Route
 
 from memcp.auth import BearerGate
+from memcp.backend import MemoryBackend
 from memcp.backend.mem0 import Mem0Backend
 from memcp.config import Config
 from memcp.tools import register_tools
@@ -30,7 +35,7 @@ with the user first; delete_all_memories requires a scope.
 """
 
 
-def create_app(config: Config) -> tuple[Any, Mem0Backend]:
+def create_app(config: Config) -> tuple[Any, MemoryBackend]:
     """Build and return (asgi_app, backend) so the caller can manage shutdown."""
     mcp = FastMCP(
         "memcp",
@@ -43,5 +48,21 @@ def create_app(config: Config) -> tuple[Any, Mem0Backend]:
     backend = Mem0Backend(config.mem0_api_base, config.mem0_api_key)
     register_tools(mcp, backend, config)
 
-    app = BearerGate(mcp.streamable_http_app(), config.shim_auth_token)
+    mcp_app = BearerGate(mcp.streamable_http_app(), config.shim_auth_token)
+
+    async def health(request: Request) -> JSONResponse:
+        status = await backend.health()
+        code = 200 if status.status == "healthy" else 503
+        return JSONResponse(
+            {"status": status.status, "backend": status.backend, "latency_ms": status.latency_ms},
+            status_code=code,
+        )
+
+    app = Starlette(
+        routes=[
+            Route("/health", health),
+            Mount("/", app=mcp_app),
+        ],
+    )
+
     return app, backend
