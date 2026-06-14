@@ -17,7 +17,7 @@ Currently wraps [mem0](https://github.com/mem0ai/mem0) as the first backend. Des
 ### Requirements
 
 - Python 3.12+
-- A running [mem0](https://github.com/mem0ai/mem0) self-hosted instance
+- A running [mem0](https://github.com/mem0ai/mem0) self-hosted instance (not needed for `MEMCP_BACKEND=in_memory`)
 
 ### Install
 
@@ -29,10 +29,10 @@ pip install -e ".[dev]"
 
 | Variable | Required | Description |
 |---|---|---|
-| `MEM0_API_BASE` | Yes | Base URL of your mem0 REST API |
-| `MEM0_API_KEY` | Yes | API key for the mem0 server |
-| `SHIM_AUTH_TOKEN` | No | Bearer token clients must present (unset = open) |
-| `MEM0_USER_ID` | No | Fixed user ID for all calls (default: `default_user`) |
+| `MEMCP_BACKEND` | No | Backend: `mem0` (default) or `in_memory` |
+| `MEM0_API_BASE` | mem0 | Base URL of your mem0 REST API |
+| `MEM0_API_KEY` | mem0 | API key for the mem0 server |
+| `MEMCP_AUTH_TOKENS` | No | Token-to-user mapping: `tok1:alice,tok2:bob` (unset or empty = unauthenticated) |
 | `MEMCP_HOST` | No | Bind address (default: `0.0.0.0`) |
 | `MEMCP_PORT` | No | Bind port (default: `8080`) |
 | `MEMCP_LOG_LEVEL` | No | Log level (default: `INFO`) |
@@ -53,7 +53,7 @@ python -m memcp
       "type": "streamable-http",
       "url": "https://your-host:8080/mcp",
       "headers": {
-        "Authorization": "Bearer YOUR_SHIM_AUTH_TOKEN"
+        "Authorization": "Bearer YOUR_TOKEN"
       }
     }
   }
@@ -79,6 +79,7 @@ python -m memcp
 | `get_memory` | Fetch a single memory by ID |
 | `update_memory` | Replace a memory's content |
 | `list_memories` | List memories, optionally scoped |
+| `export_memories` | Export all memories for backup/portability |
 | `memory_history` | Change history for a memory |
 | `memory_entities` | Extracted entities and relationships |
 

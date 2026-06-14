@@ -115,17 +115,8 @@ class InMemoryBackend(MemoryBackend):
             raise MemoryAPIError(404, "Not found")
         if entry["user_id"] != user_id:
             raise MemoryAPIError(404, "Not found")
-        now = datetime.now(UTC).isoformat()
-        if memory_id in self._history:
-            self._history[memory_id].append(
-                {
-                    "action": "deleted",
-                    "timestamp": now,
-                    "content_before": entry["content"],
-                    "content_after": None,
-                }
-            )
         del self._store[memory_id]
+        self._history.pop(memory_id, None)
         return True
 
     async def delete_all(self, user_id: str, scope: dict[str, Any]) -> int:
@@ -238,7 +229,7 @@ class InMemoryBackend(MemoryBackend):
     async def history(self, user_id: str, memory_id: str) -> list[HistoryEntry]:
         entry = self._store.get(memory_id)
         if entry is None or entry["user_id"] != user_id:
-            return []
+            raise MemoryAPIError(404, "Not found")
         raw = self._history.get(memory_id, [])
         return [
             HistoryEntry(
