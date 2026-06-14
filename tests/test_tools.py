@@ -641,6 +641,46 @@ async def test_tenant_isolation_delete(mcp_with_tools):
     reset_tenant(tok)
 
 
+async def test_tenant_isolation_update(mcp_with_tools):
+    """One tenant cannot update another's memories."""
+    from memcp.auth import reset_tenant, set_tenant
+
+    mcp, _ = mcp_with_tools
+
+    tok = set_tenant("owner")
+    added = await mcp.call("add_memory", content="original")
+    memory_id = added["results"][0]["id"]
+    reset_tenant(tok)
+
+    tok = set_tenant("attacker")
+    result = await mcp.call("update_memory", memory_id=memory_id, content="hijacked")
+    assert result["error"]["code"] == "not_found"
+    reset_tenant(tok)
+
+    # Verify unchanged for owner
+    tok = set_tenant("owner")
+    result = await mcp.call("get_memory", memory_id=memory_id)
+    assert result["content"] == "original"
+    reset_tenant(tok)
+
+
+async def test_tenant_isolation_history(mcp_with_tools):
+    """One tenant cannot read another's memory history."""
+    from memcp.auth import reset_tenant, set_tenant
+
+    mcp, _ = mcp_with_tools
+
+    tok = set_tenant("owner")
+    added = await mcp.call("add_memory", content="private data")
+    memory_id = added["results"][0]["id"]
+    reset_tenant(tok)
+
+    tok = set_tenant("attacker")
+    result = await mcp.call("memory_history", memory_id=memory_id)
+    assert result["error"]["code"] == "not_found"
+    reset_tenant(tok)
+
+
 # ---------------------------------------------------------------------------
 # Input validation bounds
 # ---------------------------------------------------------------------------
@@ -700,6 +740,26 @@ async def test_threshold_negative_rejected(mcp_with_tools):
     mcp, _ = mcp_with_tools
     result = await mcp.call("search_memory", query="test", threshold=-0.1)
     assert result["error"]["code"] == "validation_error"
+
+
+async def test_memory_id_too_long_rejected(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("get_memory", memory_id="a" * 129)
+    assert result["error"]["code"] == "validation_error"
+
+
+async def test_content_too_long_rejected(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("add_memory", content="x" * 100_001)
+    assert result["error"]["code"] == "validation_error"
+    assert "maximum" in result["error"]["message"]
+
+
+async def test_query_too_long_rejected(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("search_memory", query="x" * 10_001)
+    assert result["error"]["code"] == "validation_error"
+    assert "maximum" in result["error"]["message"]
 
 
 # ---------------------------------------------------------------------------

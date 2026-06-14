@@ -43,7 +43,8 @@ def _create_backend(config: Config) -> MemoryBackend:
     if config.memcp_backend == "in_memory":
         return InMemoryBackend()
     if config.memcp_backend == "mem0":
-        assert config.mem0_api_base and config.mem0_api_key
+        if not config.mem0_api_base or not config.mem0_api_key:
+            raise ValueError("MEM0_API_BASE and MEM0_API_KEY required for mem0 backend")
         return Mem0Backend(config.mem0_api_base, config.mem0_api_key)
     raise ValueError(f"Unknown backend: {config.memcp_backend}")
 

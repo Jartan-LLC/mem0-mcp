@@ -18,8 +18,8 @@ from memcp.types import (
 class MemoryBackend(ABC):
     """Abstract base class for memory storage backends.
 
-    @experimental — extracted from the mem0 adapter. Will be refined
-    when a second backend (Cognee) is added in v0.2.
+    @experimental — validated against mem0 and in-memory adapters.
+    Will be refined when Cognee adapter is added in v0.2.
     """
 
     # --- required (universal tools) ---

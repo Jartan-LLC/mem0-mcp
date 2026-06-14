@@ -21,7 +21,7 @@ async def test_health_endpoint_unhealthy():
     data = resp.json()
     assert data["status"] == "unhealthy"
     assert data["backend"] == "mem0"
-    assert "latency_ms" in data
+    assert isinstance(data["latency_ms"], (int, float))
     await backend.close()
 
 

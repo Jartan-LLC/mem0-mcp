@@ -47,7 +47,7 @@ def reset_tenant(token: Any) -> None:
 @runtime_checkable
 class Resolver(Protocol):
     async def resolve(self, token: str) -> str | None:
-        """Map a bearer token to a user_id. Returns None if invalid."""
+        """Map a bearer token to a user_id. Returns None for invalid tokens (never raises)."""
         ...
 
 
@@ -58,6 +58,7 @@ class StaticResolver:
         self._mapping = mapping
 
     async def resolve(self, token: str) -> str | None:
+        # Iterate all tokens without early return — constant-time to prevent timing oracle
         matched: str | None = None
         for known_token, user_id in self._mapping.items():
             if hmac.compare_digest(token, known_token):
@@ -152,4 +153,4 @@ class BearerGate:
                 ],
             }
         )
-        await send({"type": "http.response.body", "body": body})
+        await send({"type": "http.response.body", "body": body, "more_body": False})

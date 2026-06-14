@@ -17,7 +17,7 @@ Currently wraps [mem0](https://github.com/mem0ai/mem0) as the first backend. Des
 ### Requirements
 
 - Python 3.12+
-- A running [mem0](https://github.com/mem0ai/mem0) self-hosted instance
+- A running [mem0](https://github.com/mem0ai/mem0) self-hosted instance (not needed for `MEMCP_BACKEND=in_memory`)
 
 ### Install
 

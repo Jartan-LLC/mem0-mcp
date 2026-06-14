@@ -10,7 +10,7 @@ import logging
 from typing import Any
 
 from memcp.auth import get_tenant
-from memcp.backend.base import MemoryBackend
+from memcp.backend import MemoryBackend
 from memcp.config import Config
 from memcp.types import (
     MAX_EXPORT,
@@ -70,8 +70,6 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             scope = _validate_scope(scope, allowed_scope_keys)
         except _ScopeError as e:
             return e.error
-        except ValueError as e:
-            return canonical_error("nested_filter", str(e))
         try:
             result = await backend.add(
                 user_id, content, scope=scope, metadata=metadata, infer=infer
@@ -112,8 +110,6 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             scope = _validate_scope(scope, allowed_scope_keys)
         except _ScopeError as e:
             return e.error
-        except ValueError as e:
-            return canonical_error("nested_filter", str(e))
         try:
             results = await backend.search(
                 user_id, query, scope=scope, limit=limit, threshold=threshold
@@ -156,8 +152,6 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             cleaned = _validate_scope(scope, allowed_scope_keys)
         except _ScopeError as e:
             return e.error
-        except ValueError as e:
-            return canonical_error("nested_filter", str(e))
         if not cleaned:
             return canonical_error(
                 "scope_required",
@@ -230,8 +224,6 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
                 scope = _validate_scope(scope, allowed_scope_keys)
             except _ScopeError as e:
                 return e.error
-            except ValueError as e:
-                return canonical_error("nested_filter", str(e))
             try:
                 result = await backend.list_memories(
                     user_id, scope=scope, limit=limit, cursor=cursor
@@ -343,8 +335,6 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
                 scope = _validate_scope(scope, allowed_scope_keys)
             except _ScopeError as e:
                 return e.error
-            except ValueError as e:
-                return canonical_error("nested_filter", str(e))
             try:
                 result = await backend.entities(user_id, scope=scope, limit=limit)
             except MemoryAPIError as e:
@@ -372,7 +362,10 @@ def _validate_scope(scope: dict[str, Any] | None, allowed_keys: set[str]) -> dic
     if "user_id" in scope:
         scope = {k: v for k, v in scope.items() if k != "user_id"}
         logger.warning("Stripped user_id from scope dict; remaining keys: %s", list(scope.keys()))
-    reject_nested_filters(scope)
+    try:
+        reject_nested_filters(scope)
+    except ValueError as e:
+        raise _ScopeError(canonical_error("nested_filter", str(e))) from e
     if len(scope) > MAX_SCOPE_KEYS:
         raise _ScopeError(
             canonical_error("validation_error", f"Scope has too many keys (max {MAX_SCOPE_KEYS})")

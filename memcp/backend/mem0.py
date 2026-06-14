@@ -134,7 +134,10 @@ class Mem0Backend(MemoryBackend):
             payload["metadata"] = metadata
 
         result = await self._request("POST", "/memories", json=payload)
-        results = (result or {}).get("results", []) if isinstance(result, dict) else []
+        if not isinstance(result, dict):
+            logger.warning("Unexpected mem0 POST response shape: %s", type(result).__name__)
+            return []
+        results = result.get("results", [])
         if not results:
             return []
         return [
@@ -230,7 +233,7 @@ class Mem0Backend(MemoryBackend):
         # mem0 PUT returns {"message": "..."}, not the memory. Fetch it.
         updated = await self.get(user_id, memory_id)
         if updated is None:
-            raise MemoryAPIError(404, "Memory not found")
+            raise MemoryAPIError(503, "Update succeeded but read-back failed")
         return updated
 
     async def list_memories(
@@ -244,6 +247,11 @@ class Mem0Backend(MemoryBackend):
         params = _build_identifier_params(user_id, scope)
         result = await self._request("GET", "/memories", params=params)
         raw = result if isinstance(result, list) else (result or {}).get("results", [])
+        if len(raw) > 5000:
+            logger.warning(
+                "Large result set from mem0 list endpoint: %d memories loaded into memory",
+                len(raw),
+            )
         memories = [_parse_memory(r) for r in raw]
         return paginate(memories, cursor, limit)
 
@@ -276,6 +284,12 @@ class Mem0Backend(MemoryBackend):
         raw = result if isinstance(result, list) else []
         # mem0 /entities ignores user_id param — post-filter for tenant isolation
         filtered = [e for e in raw if e.get("id") == user_id]
+        if raw and not filtered:
+            logger.warning(
+                "Entities post-filter returned empty for user %s (%d raw entities)",
+                user_id,
+                len(raw),
+            )
         return EntitiesResult(entities=filtered[:limit])
 
     # --- lifecycle ---

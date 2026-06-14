@@ -23,7 +23,7 @@ def backend() -> InMemoryBackend:
 
 
 @pytest.fixture(autouse=True)
-def tenant_context():
+def tenant_context() -> None:
     """Set and reset tenant contextvar per test. Prevents leakage."""
     tok = set_tenant("test_user")
     yield

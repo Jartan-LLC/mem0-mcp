@@ -99,8 +99,8 @@ async def test_static_resolver_invalid_token():
     assert await resolver.resolve("bad-token") is None
 
 
-async def test_static_resolver_timing_safe():
-    """Resolver uses hmac.compare_digest, not ==."""
+async def test_static_resolver_near_miss_rejected():
+    """Partial/similar tokens don't match (hmac.compare_digest, not prefix check)."""
     resolver = _resolver()
     assert await resolver.resolve("secret-toke") is None
     assert await resolver.resolve("secret-token\x00") is None
@@ -183,6 +183,12 @@ async def test_invalid_token_rejected():
 async def test_missing_token_rejected():
     gate = BearerGate(_dummy_app, _resolver())
     status, _body = await _make_request(gate, [])
+    assert status == 401
+
+
+async def test_empty_bearer_token_rejected():
+    gate = BearerGate(_dummy_app, _resolver())
+    status, _body = await _make_request(gate, [(b"authorization", b"Bearer ")])
     assert status == 401
 
 
