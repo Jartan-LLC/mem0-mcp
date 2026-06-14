@@ -33,13 +33,40 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: pytest -x
 
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v3
+
+      - run: docker build -t memcp:ci .
+
+      - name: Verify container starts and health endpoint responds
+        run: |
+          docker run -d --name memcp-ci \
+            -e MEM0_API_BASE=http://localhost:9999 \
+            -e MEM0_API_KEY=fake \
+            -p 8080:8080 \
+            memcp:ci
+          sleep 3
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/health || true)
+          docker logs memcp-ci
+          docker stop memcp-ci
+          if [ "$STATUS" = "503" ] || [ "$STATUS" = "200" ]; then
+            echo "Health endpoint responding: $STATUS"
+          else
+            echo "Health endpoint failed: $STATUS"
+            exit 1
+          fi
+
   check:
     if: always()
-    needs: [lint, test]
+    needs: [lint, test, build]
     runs-on: ubuntu-latest
     steps:
       - run: |
-          results=("${{ needs.lint.result }}" "${{ needs.test.result }}")
+          results=("${{ needs.lint.result }}" "${{ needs.test.result }}" "${{ needs.build.result }}")
           for r in "${results[@]}"; do
             if [[ "$r" != "success" && "$r" != "skipped" ]]; then
               echo "Check failed: $r"
