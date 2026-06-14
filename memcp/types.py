@@ -20,6 +20,7 @@ MAX_SCOPE_VALUE_LENGTH = 256
 MAX_QUERY_LENGTH = 10_000
 MAX_LIMIT = 1_000
 MAX_EXPORT = 10_000
+MAX_IMPORT = 1_000
 
 
 def validate_memory_id(memory_id: str) -> str:

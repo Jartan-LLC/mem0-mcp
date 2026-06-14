@@ -1,6 +1,6 @@
 # memcp Roadmap: v0.1 → v1.0
 
-**Current state:** v0.1.0 shipped. 12 MCP tools, 2 backends (mem0 + in-memory), multi-tenant auth, export/import with dedup, 163 tests.
+**Current state (2026-06-14):** v0.1.0 shipped. 12 MCP tools, 2 backends (mem0 + in-memory), multi-tenant auth, export/import with dedup.
 
 ---
 

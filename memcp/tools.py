@@ -16,6 +16,7 @@ from memcp.backend import MemoryBackend
 from memcp.config import Config
 from memcp.types import (
     MAX_EXPORT,
+    MAX_IMPORT,
     MAX_SCOPE_KEY_LENGTH,
     MAX_SCOPE_KEYS,
     MAX_SCOPE_VALUE_LENGTH,
@@ -54,10 +55,11 @@ def _log_tool_call(fn: Any) -> Any:
             return result
         except Exception:
             duration_ms = (time.monotonic() - start) * 1000
-            logger.info(
+            logger.warning(
                 "tool=%s status=exception duration_ms=%.1f",
                 fn.__name__,
                 duration_ms,
+                exc_info=True,
             )
             raise
 
@@ -245,8 +247,6 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
                 "truncated": truncated,
             }
 
-        MAX_IMPORT = 1_000
-
         @mcp.tool(
             description=(
                 "Batch-import from JSON array. Each entry needs 'content'; "
@@ -280,8 +280,8 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
                 try:
                     result = await backend.list_memories(user_id, limit=MAX_EXPORT + 1)
                     existing = {m.content: m.id for m in result.memories}
-                except MemoryAPIError:
-                    pass
+                except MemoryAPIError as e:
+                    return _backend_error(e)
 
             imported = []
             skipped = []
@@ -294,6 +294,12 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
                     continue
 
                 scope = entry.get("scope")
+                if scope:
+                    try:
+                        scope = _validate_scope(scope, allowed_scope_keys)
+                    except _ScopeError as e:
+                        errors.append({"index": i, "error": e.error["error"]["message"]})
+                        continue
                 metadata = entry.get("metadata")
                 dup_id = existing.get(content)
 

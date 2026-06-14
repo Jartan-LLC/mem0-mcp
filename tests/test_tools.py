@@ -14,6 +14,7 @@ import pytest
 from memcp.backend.in_memory import InMemoryBackend
 from memcp.config import Config
 from memcp.tools import register_tools
+from memcp.types import MemoryAPIError
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -782,6 +783,13 @@ async def test_import_memories_basic(mcp_with_tools):
     assert result["skipped"] == 0
 
 
+async def test_import_memories_over_limit(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    memories = [{"content": f"mem {i}"} for i in range(1001)]
+    result = await mcp.call("import_memories", memories=memories)
+    assert result["error"]["code"] == "validation_error"
+
+
 async def test_import_memories_empty_rejected(mcp_with_tools):
     mcp, _ = mcp_with_tools
     result = await mcp.call("import_memories", memories=[])
@@ -853,6 +861,47 @@ async def test_import_memories_dedup_duplicate(mcp_with_tools):
     assert result["imported"] == 1
     assert result["skipped"] == 0
     assert result["results"][0]["action"] == "created"
+
+
+async def test_import_memories_backend_error_per_entry(mcp_with_tools):
+    mcp, backend = mcp_with_tools
+    original_add = backend.add
+
+    call_count = 0
+
+    async def failing_add(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 2:
+            raise MemoryAPIError(503, "backend down")
+        return await original_add(*args, **kwargs)
+
+    backend.add = failing_add
+    result = await mcp.call(
+        "import_memories",
+        memories=[{"content": "one"}, {"content": "two"}, {"content": "three"}],
+        on_conflict="duplicate",
+    )
+    assert result["imported"] == 2
+    assert len(result["errors"]) == 1
+    assert result["errors"][0]["index"] == 1
+    backend.add = original_add
+
+
+async def test_import_memories_scope_injection_stripped(mcp_with_tools):
+    """user_id in per-entry scope is stripped, memory stored for real tenant."""
+    mcp, backend = mcp_with_tools
+    result = await mcp.call(
+        "import_memories",
+        memories=[{"content": "attack data", "scope": {"user_id": "victim"}}],
+        on_conflict="duplicate",
+    )
+    assert result["imported"] == 1
+    # Verify stored for test_user, not victim
+    listing = await backend.list_memories("test_user")
+    assert any(m.content == "attack data" for m in listing.memories)
+    victim = await backend.list_memories("victim")
+    assert len(victim.memories) == 0
 
 
 async def test_import_memories_tenant_isolation(mcp_with_tools):
