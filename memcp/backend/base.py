@@ -93,7 +93,7 @@ class MemoryBackend(ABC):
         raise NotImplementedError
 
     async def history(self, user_id: str, memory_id: str) -> list[HistoryEntry]:
-        """Returns empty list if memory_id not found or not owned by user_id."""
+        """Raises MemoryAPIError(404) if not found or not owned by user_id."""
         raise NotImplementedError
 
     async def entities(

@@ -251,7 +251,7 @@ class Mem0Backend(MemoryBackend):
         # Fetch-then-verify: mem0 history endpoint is global
         existing = await self.get(user_id, memory_id)
         if existing is None:
-            return []
+            raise MemoryAPIError(404, "Not found")
         result = await self._request("GET", f"/memories/{memory_id}/history")
         if not result:
             return []

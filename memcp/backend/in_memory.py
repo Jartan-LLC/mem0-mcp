@@ -238,7 +238,7 @@ class InMemoryBackend(MemoryBackend):
     async def history(self, user_id: str, memory_id: str) -> list[HistoryEntry]:
         entry = self._store.get(memory_id)
         if entry is None or entry["user_id"] != user_id:
-            return []
+            raise MemoryAPIError(404, "Not found")
         raw = self._history.get(memory_id, [])
         return [
             HistoryEntry(

@@ -26,7 +26,11 @@ def main() -> None:
     if not config.memcp_auth_tokens:
         logger.warning("MEMCP_AUTH_TOKENS is unset — the MCP endpoint is UNAUTHENTICATED.")
 
-    app, _backend = create_app(config)
+    try:
+        app, _backend = create_app(config)
+    except ValueError as e:
+        print(f"Configuration error:\n{e}", file=sys.stderr)
+        raise SystemExit(1) from None
     uvicorn.run(app, host=config.host, port=config.port, log_config=None)
 
 

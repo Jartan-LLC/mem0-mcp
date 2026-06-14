@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multi-tenant auth via `MEMCP_AUTH_TOKENS` (token:user_id mapping)
 - Resolver Protocol for pluggable auth backends
 - Per-request tenant identity via contextvars
-- MCP tools: add, search, delete, delete_all, status, export, get, update, list, history, entities
+- MCP tools: add_memory, search_memory, delete_memory, delete_all_memories, memory_status, export_memories, get_memory, update_memory, list_memories, memory_history, memory_entities
 - Scope key validation against backend-declared keys
 - Input validation (content length, query length, limit min/max, scope size/types)
 - Nested boolean filter rejection with canonical error

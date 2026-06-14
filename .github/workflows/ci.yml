@@ -60,7 +60,7 @@ jobs:
             sleep 1
           done
           docker logs memcp-ci
-          docker stop memcp-ci
+          docker rm -f memcp-ci
           if [ "$STATUS" = "503" ] || [ "$STATUS" = "200" ]; then
             echo "Health endpoint responding: $STATUS"
           else

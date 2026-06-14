@@ -354,8 +354,7 @@ async def test_update_memory_not_found(mcp_with_tools):
 async def test_memory_history_not_found(mcp_with_tools):
     mcp, _ = mcp_with_tools
     result = await mcp.call("memory_history", memory_id="nonexistent-valid-id")
-    # in-memory backend returns empty history for unknown IDs
-    assert result["history"] == []
+    assert result["error"]["code"] == "not_found"
 
 
 async def test_add_memory_empty_extraction(mcp_with_tools):
@@ -723,3 +722,17 @@ async def test_export_memories_backend_error(mcp_with_tools):
     result = await mcp.call("export_memories")
     assert result["error"]["code"] == "backend_error"
     assert result["error"]["retry"] is True
+
+
+async def test_export_memories_over_limit(mcp_with_tools):
+    mcp, backend = mcp_with_tools
+    from memcp.types import MAX_EXPORT, ListResult, Memory
+
+    async def big_list(*args, **kwargs):
+        memories = [Memory(id=f"m-{i}", content=f"mem {i}") for i in range(MAX_EXPORT + 1)]
+        return ListResult(memories=memories)
+
+    backend.list_memories = big_list
+    result = await mcp.call("export_memories")
+    assert result["error"]["code"] == "validation_error"
+    assert "limit" in result["error"]["message"].lower()

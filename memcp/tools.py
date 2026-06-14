@@ -218,6 +218,42 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
                 "count": len(result.memories),
             }
 
+        @mcp.tool(
+            annotations=READ_ONLY,
+            description=(
+                "List stored memories, optionally scoped. For finding something "
+                "specific, prefer search_memory."
+            ),
+        )
+        async def list_memories(
+            scope: dict[str, Any] | None = None,
+            limit: int = 100,
+            cursor: str | None = None,
+        ) -> Any:
+            try:
+                validate_limit(limit)
+            except ValueError as e:
+                return canonical_error("validation_error", str(e))
+            user_id = get_tenant()
+            try:
+                scope = _validate_scope(scope, allowed_scope_keys)
+            except _InvalidScope as e:
+                return e.error
+            except ValueError as e:
+                return canonical_error("nested_filter", str(e))
+            try:
+                result = await backend.list_memories(
+                    user_id, scope=scope, limit=limit, cursor=cursor
+                )
+            except ValueError as e:
+                return canonical_error("validation_error", str(e))
+            except MemoryAPIError as e:
+                return _backend_error(e)
+            return {
+                "memories": [_serialize_memory(m) for m in result.memories],
+                "next_cursor": result.next_cursor,
+            }
+
     if "get_memory" in caps:
 
         @mcp.tool(
@@ -266,44 +302,6 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
                     return canonical_error("not_found", NOT_FOUND_MSG)
                 return _backend_error(e)
             return _serialize_memory(result)
-
-    if "list_memories" in caps:
-
-        @mcp.tool(
-            annotations=READ_ONLY,
-            description=(
-                "List stored memories, optionally scoped. For finding something "
-                "specific, prefer search_memory."
-            ),
-        )
-        async def list_memories(
-            scope: dict[str, Any] | None = None,
-            limit: int = 100,
-            cursor: str | None = None,
-        ) -> Any:
-            try:
-                validate_limit(limit)
-            except ValueError as e:
-                return canonical_error("validation_error", str(e))
-            user_id = get_tenant()
-            try:
-                scope = _validate_scope(scope, allowed_scope_keys)
-            except _InvalidScope as e:
-                return e.error
-            except ValueError as e:
-                return canonical_error("nested_filter", str(e))
-            try:
-                result = await backend.list_memories(
-                    user_id, scope=scope, limit=limit, cursor=cursor
-                )
-            except ValueError as e:
-                return canonical_error("validation_error", str(e))
-            except MemoryAPIError as e:
-                return _backend_error(e)
-            return {
-                "memories": [_serialize_memory(m) for m in result.memories],
-                "next_cursor": result.next_cursor,
-            }
 
     if "memory_history" in caps:
 
@@ -354,10 +352,10 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
                 scope = _validate_scope(scope, allowed_scope_keys)
             except _InvalidScope as e:
                 return e.error
-            try:
-                result = await backend.entities(user_id, scope=scope, limit=limit)
             except ValueError as e:
                 return canonical_error("nested_filter", str(e))
+            try:
+                result = await backend.entities(user_id, scope=scope, limit=limit)
             except MemoryAPIError as e:
                 return _backend_error(e)
             return {
