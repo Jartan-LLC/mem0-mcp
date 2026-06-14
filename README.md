@@ -82,6 +82,13 @@ python -m memcp
 | `memory_history` | Change history for a memory |
 | `memory_entities` | Extracted entities and relationships |
 
+## Docker
+
+```bash
+cp .env.example .env   # fill in MEM0_API_BASE + MEM0_API_KEY
+docker compose up -d
+```
+
 ## Development
 
 ```bash
