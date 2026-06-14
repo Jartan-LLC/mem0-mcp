@@ -1,58 +1,80 @@
-# Project Template
+# mem0-mcp
 
-Starter template with dev container, Claude Code configuration, GitHub workflows, and project conventions.
+MCP server exposing self-hosted mem0 long-term memory as tools over streamable HTTP.
 
-## Getting Started
+AI clients (Claude Code, OpenClaw, etc.) connect to this server and share one long-term memory pool backed by your own mem0 instance.
 
-Run `/onboard` in Claude Code to set up this template for your project. It will interview you, configure all the files, and tell you which manual steps remain.
+## Features
 
-## What's Included
+- Semantic search, list, add, update, delete memories
+- Flat filter support (agent_id, run_id, metadata)
+- Bearer token auth gate (ASGI middleware)
+- Stateless HTTP transport — safe behind reverse proxies
 
-| Area | Contents |
-|------|----------|
-| `.devcontainer/` | Dev container with Claude Code CLI, Docker, GitHub CLI, desktop-lite |
-| `.claude/` | Agents, commands, skills, settings with plugins |
-| `.github/` | Issue forms, PR template, CI stub, Dependabot, Claude Code workflow, security policy |
-| `CLAUDE.md` | AI assistant rules, verification commands, skill index |
+## Setup
 
-## Post-Fork Checklist
+### Requirements
 
-If you prefer to set up manually instead of using `/onboard`:
+- Python 3.13+
+- A running [mem0](https://github.com/mem0ai/mem0) self-hosted instance
 
-### Required
+### Environment Variables
 
-- [ ] Update `CLAUDE.md` — replace placeholder comments:
-  - Project name and description (line 1 and 3)
-  - Verify commands with your actual build/test/lint commands
-  - Corrections with any version-specific overrides for your stack
-- [ ] Update `CLAUDE.md` Skills section — remove skills that don't apply to your project, add project-specific ones
-- [ ] Update `.devcontainer/devcontainer.json` — change the desktop-lite password, add/remove language features and extensions for your stack
-- [ ] Update `.devcontainer/setup.sh` — add dependency installation for your stack
-- [ ] Update `.gitignore` — add language-specific patterns for your stack
-- [ ] Update `.editorconfig` — adjust formatting rules for your language (e.g., tabs for Go)
-- [ ] Update `.github/CODEOWNERS` — uncomment and set owner usernames/teams
-- [ ] Update `.github/SECURITY.md` — set supported versions and response timeline
-- [ ] Update `.github/ISSUE_TEMPLATE/config.yml` — replace `ORG/REPO` in contact link URLs with your GitHub org and repo name
-- [ ] Update `.github/dependabot.yml` — remove ecosystems you don't use, add ones you need, adjust directories if not at root
-- [ ] Fill in `.github/workflows/ci.yml` — replace TODO comments with your lint and test commands
-- [ ] Create a `LICENSE` file
-- [ ] When removing skills, update any agent files that reference them in their `skills:` frontmatter
-- [ ] Add secrets to your repo:
-  - `ANTHROPIC_API_KEY` — for the Claude Code workflow
-  - `PAT` — a GitHub Personal Access Token with `repo` scope, used by the Claude Code workflow for checkout
+| Variable | Required | Description |
+|---|---|---|
+| `MEM0_API_BASE` | Yes | Base URL of your mem0 REST API |
+| `MEM0_API_KEY` | Yes | API key for the mem0 server |
+| `SHIM_AUTH_TOKEN` | No | Bearer token clients must present (unset = open) |
+| `MEM0_USER_ID` | No | Fixed user ID for all calls (default: `default_user`) |
+| `MEM0_DEFAULT_TOP_K` | No | Default search result count (default: `100`) |
+| `HOST` | No | Bind address (default: `0.0.0.0`) |
+| `PORT` | No | Bind port (default: `8080`) |
 
-### Recommended
+### Run
 
-- [ ] Enable GitHub Discussions (Settings > General > Features) — issue template config links to it
-- [ ] Enable CodeQL default setup (Settings > Security > Code scanning)
-- [ ] Enable secret scanning with push protection (Settings > Security > Secret Protection)
-- [ ] Configure branch ruleset for `main` — require PR reviews, require CI to pass, block force pushes
-- [ ] Enable auto-merge (Settings > General > Allow auto-merge) — Dependabot minor/patch PRs auto-merge after CI passes
-- [ ] Review `.github/workflows/claude.yml` — uses `--dangerously-skip-permissions` which grants Claude unrestricted tool access in CI
+```bash
+pip install -r requirements.txt
+python server.py
+```
 
-### Cleanup
+### Connect from Claude Code
 
-- [ ] Replace this README with your own
-- [ ] Remove `.claude/skills/` entries that don't apply to your project type
-- [ ] Remove `.claude/agents/` entries that don't apply (e.g., `frontend-reviewer` for a CLI project)
-- [ ] Delete `.claude/commands/onboard.md`
+```json
+{
+  "mcpServers": {
+    "mem0": {
+      "type": "streamable-http",
+      "url": "https://your-host:8080/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_SHIM_AUTH_TOKEN"
+      }
+    }
+  }
+}
+```
+
+## MCP Tools
+
+| Tool | Description |
+|---|---|
+| `add_memory` | Store a durable fact, preference, or decision |
+| `search_memory` | Semantic search across stored memories |
+| `list_memories` | List memories (optionally scoped by agent/run) |
+| `get_memory` | Fetch a single memory by ID |
+| `update_memory` | Replace a memory's text and metadata |
+| `delete_memory` | Delete a single memory |
+| `delete_all_memories` | Delete all memories within a scope |
+| `list_entities` | List agent/run scopes with counts |
+| `get_memory_history` | View change history for a memory |
+
+## Development
+
+```bash
+ruff check .
+ruff format --check .
+pytest -x
+```
+
+## License
+
+AGPL-3.0 — see [LICENSE](LICENSE).

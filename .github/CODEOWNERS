@@ -1,12 +1,8 @@
-# This file has no effect until you uncomment the rules below
-# and replace @your-username with actual GitHub usernames or @org/team-name.
-# CODEOWNERS only enforces reviews when branch protection requires PR reviews.
-
 # Default owner for everything
-# * @your-username
+* @JartanFTW
 
 # Protect AI assistant and CI configuration
-# CLAUDE.md @your-username
-# .claude/ @your-username
-# .github/ @your-username
-# CODEOWNERS @your-username
+CLAUDE.md @JartanFTW
+.claude/ @JartanFTW
+.github/ @JartanFTW
+CODEOWNERS @JartanFTW

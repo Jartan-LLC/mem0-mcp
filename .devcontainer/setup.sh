@@ -2,16 +2,6 @@
 
 echo "Setting up development environment..."
 
-# Enable pnpm via corepack (ships with Node.js)
-sudo corepack enable
-
-# Install Node.js dependencies from all package.json files
-while IFS= read -r -d '' pkg_file; do
-    dir=$(dirname "$pkg_file")
-    echo "  Installing from $dir..."
-    (cd "$dir" && pnpm install)
-done < <(find . -name "package.json" -not -path "*/node_modules/*" -type f -print0 2>/dev/null)
-
 # Install Python dependencies from all requirements.txt files
 echo "Installing Python dependencies..."
 while IFS= read -r -d '' req_file; do
@@ -42,12 +32,6 @@ if command -v claude &> /dev/null; then
         claude plugin install caveman@caveman --scope project || true
     fi
 fi
-
-# Optional: Headroom token compression proxy (https://github.com/chopratejas/headroom)
-# Reduces token usage 60-95% by compressing context sent to the LLM.
-# Uncomment to enable:
-# pip install "headroom-ai[proxy]"
-# headroom init claude
 
 gh auth status 2>/dev/null || echo "Note: Run 'gh auth login' to enable GitHub CLI (gh pr, gh issue, etc.)"
 

@@ -1,6 +1,6 @@
-# Project Name
+# mem0-mcp
 
-<!-- ONE LINE: what this project is, primary language/framework, deployment target -->
+MCP server exposing self-hosted mem0 long-term memory as tools over streamable HTTP. Python, FastMCP, deployed behind Traefik.
 
 ## Rules
 
@@ -26,9 +26,9 @@
 
 ## Corrections
 
-<!-- Version mismatches are the most common — fill these in early.
-"We use Pydantic v2 field_validator, not v1 validator."
-"Next.js 15 uses async cookies() — not the sync API from v14." -->
+- FastMCP uses `mcp.server.fastmcp.FastMCP`, not `fastmcp.FastMCP`
+- mem0 self-hosted REST API does NOT support nested boolean filters (AND/OR/NOT) — they 502
+- mem0 self-hosted list endpoint does NOT filter by metadata and does NOT paginate
 
 ## Skills
 
@@ -46,9 +46,9 @@ When adding a new skill, add an entry here.
 
 ## Verify
 
-<!-- REQUIRED — replace with your build/test/lint commands:
-make test
-npm run build && npm test
-cargo check && cargo test
+```bash
+ruff check .
+ruff format --check .
+python -m py_compile server.py
 pytest -x
--->
+```

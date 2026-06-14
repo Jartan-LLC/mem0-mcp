@@ -13,33 +13,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-
-      # TODO: Add your lint/format commands
-      # Example (Python):
-      # - uses: actions/setup-python@v5
-      #   with:
-      #     python-version: "3.13"
-      # - run: pip install ruff && ruff check . && ruff format --check .
-      #
-      # Example (Node):
-      # - uses: actions/setup-node@v4
-      # - run: npm ci && npm run lint
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install ruff
+      - run: ruff check .
+      - run: ruff format --check .
 
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-
-      # TODO: Add your test commands
-      # Example (Python):
-      # - uses: actions/setup-python@v5
-      #   with:
-      #     python-version: "3.13"
-      # - run: pip install -e '.[dev]' && pytest
-      #
-      # Example (Node):
-      # - uses: actions/setup-node@v4
-      # - run: npm ci && npm test
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -r requirements.txt
+      - run: pip install pytest
+      - run: pytest -x
 
   check:
     if: always()
