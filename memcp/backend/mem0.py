@@ -1,0 +1,315 @@
+"""mem0 REST API adapter.
+
+Talks to a self-hosted mem0 instance. All mem0-specific workarounds
+(flat filters, null-as-not-found, 5xx-on-malformed-id) live here.
+"""
+
+from __future__ import annotations
+
+import time
+from typing import Any
+
+import httpx
+
+from memcp.types import (
+    AddResult,
+    EntitiesResult,
+    HealthStatus,
+    HistoryEntry,
+    ListResult,
+    Memory,
+    MemoryAPIError,
+)
+
+from .base import MemoryBackend
+
+_NESTED_FILTER_KEYS = frozenset({"AND", "OR", "NOT", "and", "or", "not"})
+
+
+def _norm(value: Any) -> Any:
+    """Return None for wildcard/empty sentinels; pass through otherwise."""
+    if isinstance(value, str) and value.strip() in ("", "*"):
+        return None
+    return value
+
+
+def _reject_nested(d: dict[str, Any]) -> None:
+    bad = _NESTED_FILTER_KEYS & set(d)
+    if bad:
+        raise ValueError(
+            f"Nested boolean filters are not supported ({sorted(bad)}). "
+            "Use discrete scope keys or metadata fields instead."
+        )
+
+
+def _build_search_filters(
+    user_id: str,
+    scope: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Flat filter dict for POST /search."""
+    filters: dict[str, Any] = {"user_id": user_id}
+    if scope:
+        _reject_nested(scope)
+        for key, val in scope.items():
+            val = _norm(val) if isinstance(val, str) else val
+            if val is not None:
+                filters[key] = val
+    return filters
+
+
+def _build_identifier_params(
+    user_id: str,
+    scope: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Query params for GET /memories and DELETE /memories."""
+    params: dict[str, Any] = {"user_id": user_id}
+    if scope:
+        for key, val in scope.items():
+            val = _norm(val)
+            if val is not None:
+                params[key] = val
+    return params
+
+
+def _lookup_by_id(call: Any) -> Any:
+    """Run a single-id API call; map not-found signals to None.
+
+    mem0 returns 200 with null body for missing IDs and 5xx for malformed IDs.
+    Both mean "not found" to callers.
+    """
+    try:
+        result = call()
+    except MemoryAPIError as e:
+        if e.status >= 500:
+            return None
+        raise
+    return result
+
+
+def _parse_memory(raw: dict[str, Any], *, score: float | None = None) -> Memory:
+    """Convert mem0's response shape to canonical Memory."""
+    return Memory(
+        id=raw.get("id", ""),
+        content=raw.get("memory", raw.get("text", "")),
+        score=score if score is not None else raw.get("score"),
+        scope={k: v for k, v in raw.items() if k in ("agent_id", "run_id") and v is not None},
+        metadata=raw.get("metadata") or {},
+        created_at=raw.get("created_at", ""),
+        updated_at=raw.get("updated_at"),
+    )
+
+
+class Mem0Backend(MemoryBackend):
+    """Adapter for self-hosted mem0 REST API."""
+
+    def __init__(self, base_url: str, api_key: str, *, timeout: float = 30.0):
+        self._http = httpx.AsyncClient(
+            base_url=base_url.rstrip("/"),
+            headers={"X-API-Key": api_key},
+            timeout=httpx.Timeout(timeout),
+            transport=httpx.AsyncHTTPTransport(retries=3),
+        )
+
+    def _request_sync(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+    ) -> Any:
+        """Synchronous request helper used inside _lookup_by_id closures."""
+        # We use a sync client for lookup_by_id patterns since they need
+        # to be called from sync closures. This will be unified in Phase 2c
+        # when all tool handlers become async.
+        import httpx as _httpx
+
+        resp = _httpx.request(
+            method,
+            f"{str(self._http.base_url).rstrip('/')}{path}",
+            params=params,
+            json=json,
+            headers={"X-API-Key": self._http.headers.get("x-api-key", "")},
+            timeout=30.0,
+        )
+        if resp.status_code >= 400:
+            raise MemoryAPIError(resp.status_code, resp.text)
+        return resp.json() if resp.content else None
+
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+    ) -> Any:
+        resp = await self._http.request(method, path, params=params, json=json)
+        if resp.status_code >= 400:
+            raise MemoryAPIError(resp.status_code, resp.text)
+        return resp.json() if resp.content else None
+
+    # --- required ---
+
+    async def add(
+        self,
+        user_id: str,
+        content: str,
+        *,
+        scope: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+        infer: bool = True,
+    ) -> AddResult | list[AddResult]:
+        payload: dict[str, Any] = {
+            "messages": [{"role": "user", "content": content}],
+            "user_id": user_id,
+            "infer": infer,
+        }
+        if scope:
+            for key, val in scope.items():
+                normed = _norm(val)
+                if normed is not None:
+                    payload[key] = normed
+        if metadata:
+            payload["metadata"] = metadata
+
+        result = await self._request("POST", "/memories", json=payload)
+        results = (result or {}).get("results", []) if isinstance(result, dict) else []
+        if not results:
+            return []
+        return [
+            AddResult(
+                id=r["id"],
+                status="ready",
+                created_at=r.get("created_at", ""),
+            )
+            for r in results
+        ]
+
+    async def search(
+        self,
+        user_id: str,
+        query: str,
+        *,
+        scope: dict[str, Any] | None = None,
+        limit: int = 10,
+        threshold: float = 0.0,
+    ) -> list[Memory]:
+        payload = {
+            "query": query,
+            "filters": _build_search_filters(user_id, scope),
+            "top_k": limit,
+            "threshold": threshold,
+        }
+        result = await self._request("POST", "/search", json=payload)
+        raw_results = (result or {}).get("results", []) if isinstance(result, dict) else []
+        return [_parse_memory(r, score=r.get("score")) for r in raw_results]
+
+    async def delete(self, user_id: str, memory_id: str) -> bool:
+        result = await self._request("DELETE", f"/memories/{memory_id}")
+        return result is not None
+
+    async def delete_all(self, user_id: str, scope: dict[str, Any]) -> int:
+        params = _build_identifier_params(user_id, scope)
+        await self._request("DELETE", "/memories", params=params)
+        return -1  # mem0 doesn't return a count
+
+    async def health(self) -> HealthStatus:
+        start = time.monotonic()
+        try:
+            await self._request("GET", "/memories", params={"user_id": "__health_check__"})
+            latency = (time.monotonic() - start) * 1000
+            return HealthStatus(status="healthy", backend="mem0", latency_ms=round(latency, 1))
+        except Exception:
+            latency = (time.monotonic() - start) * 1000
+            return HealthStatus(status="unhealthy", backend="mem0", latency_ms=round(latency, 1))
+
+    def capabilities(self) -> set[str]:
+        return {
+            "get_memory",
+            "update_memory",
+            "list_memories",
+            "memory_history",
+            "memory_entities",
+        }
+
+    def scope_keys(self) -> list[str]:
+        return ["agent_id", "run_id"]
+
+    # --- optional ---
+
+    async def get(self, user_id: str, memory_id: str) -> Memory | None:
+        result = await self._request("GET", f"/memories/{memory_id}")
+        if result is None:
+            return None
+        return _parse_memory(result)
+
+    async def update(
+        self,
+        user_id: str,
+        memory_id: str,
+        content: str,
+        *,
+        metadata: dict[str, Any] | None = None,
+    ) -> Memory:
+        body: dict[str, Any] = {"text": content}
+        if metadata is not None:
+            body["metadata"] = metadata
+        result = await self._request("PUT", f"/memories/{memory_id}", json=body)
+        if result is None:
+            raise MemoryAPIError(404, "Memory not found")
+        return _parse_memory(result)
+
+    async def list_memories(
+        self,
+        user_id: str,
+        *,
+        scope: dict[str, Any] | None = None,
+        limit: int = 100,
+        cursor: str | None = None,
+    ) -> ListResult:
+        params = _build_identifier_params(user_id, scope)
+        result = await self._request("GET", "/memories", params=params)
+        raw = result if isinstance(result, list) else (result or {}).get("results", [])
+        memories = [_parse_memory(r) for r in raw]
+        # Server-side pagination shim: mem0 returns all at once
+        if cursor:
+            try:
+                start = int(cursor)
+            except ValueError:
+                start = 0
+        else:
+            start = 0
+        page = memories[start : start + limit]
+        next_cursor = str(start + limit) if start + limit < len(memories) else None
+        return ListResult(memories=page, next_cursor=next_cursor)
+
+    async def history(self, user_id: str, memory_id: str) -> list[HistoryEntry]:
+        result = await self._request("GET", f"/memories/{memory_id}/history")
+        if not result:
+            return []
+        return [
+            HistoryEntry(
+                action=entry.get("event", "unknown"),
+                timestamp=entry.get("created_at", ""),
+                content_before=entry.get("old_memory"),
+                content_after=entry.get("new_memory"),
+            )
+            for entry in result
+        ]
+
+    async def entities(
+        self,
+        user_id: str,
+        *,
+        scope: dict[str, Any] | None = None,
+        limit: int = 100,
+    ) -> EntitiesResult:
+        result = await self._request("GET", "/entities")
+        raw = result if isinstance(result, list) else []
+        return EntitiesResult(entities=raw[:limit])
+
+    # --- lifecycle ---
+
+    async def close(self) -> None:
+        await self._http.aclose()

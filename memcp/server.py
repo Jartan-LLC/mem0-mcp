@@ -1,0 +1,45 @@
+"""Application factory — assembles FastMCP server from config + backend."""
+
+from __future__ import annotations
+
+from mcp.server.fastmcp import FastMCP
+
+from memcp.auth import BearerGate
+from memcp.backend.mem0 import Mem0Backend
+from memcp.config import Config
+from memcp.tools import register_tools
+
+INSTRUCTIONS = """\
+Long-term memory shared across your tools and sessions.
+
+When to WRITE (add_memory): whenever a durable fact, preference, decision, or \
+piece of context worth recalling later comes up — or when asked to remember \
+something. Don't store transient one-off questions or throwaway debugging context.
+
+When to SEARCH (search_memory): before answering anything that depends on what's \
+already known about the user, their projects, preferences, or prior decisions. \
+Search first; don't assume the memory is empty.
+
+Filters are flat only: narrow with scope keys. \
+Do not attempt nested boolean (AND/OR/NOT) filter expressions.
+
+Destructive operations (delete_memory, delete_all_memories) should be confirmed \
+with the user first; delete_all_memories requires a scope.
+"""
+
+
+def create_app(config: Config) -> tuple:
+    """Build and return (asgi_app, backend) so the caller can manage shutdown."""
+    mcp = FastMCP(
+        "memcp",
+        instructions=INSTRUCTIONS,
+        host=config.host,
+        port=config.port,
+        stateless_http=True,
+    )
+
+    backend = Mem0Backend(config.mem0_api_base, config.mem0_api_key)
+    register_tools(mcp, backend, config)
+
+    app = BearerGate(mcp.streamable_http_app(), config.shim_auth_token)
+    return app, backend
