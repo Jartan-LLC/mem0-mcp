@@ -84,6 +84,20 @@ class ListResult:
     next_cursor: str | None = None
 
 
+def paginate(memories: list[Memory], cursor: str | None, limit: int) -> ListResult:
+    """Cursor-based pagination over a full list of memories."""
+    if cursor:
+        try:
+            start = int(cursor)
+        except ValueError:
+            raise MemoryAPIError(400, f"Invalid cursor: {cursor}") from None
+    else:
+        start = 0
+    page = memories[start : start + limit]
+    next_cursor = str(start + limit) if start + limit < len(memories) else None
+    return ListResult(memories=page, next_cursor=next_cursor)
+
+
 @dataclass
 class HistoryEntry:
     action: str

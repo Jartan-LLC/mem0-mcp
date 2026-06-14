@@ -1,46 +1,50 @@
 ---
 name: api-error-patterns
-description: API error response format — machine-readable codes, human-readable reasons, status code rules.
-when_to_use: Writing API error handling, choosing HTTP status codes, designing error response shapes.
+description: MCP tool error response format — canonical error object, standard codes, retry semantics.
+when_to_use: Writing tool error handling, choosing error codes, designing error responses.
 user-invocable: false
 ---
 
-# API Error Conventions
+# MCP Tool Error Conventions
 
 ## Response Format
 
-All API error responses use a consistent format:
+All tool errors use the canonical error object:
 
 ```json
 {
-  "detail": {
-    "code": "UPPER_SNAKE_CASE_CODE",
-    "reason": "Human-readable message."
+  "error": {
+    "code": "snake_case_code",
+    "message": "Human-readable description.",
+    "retry": false
   }
 }
 ```
 
-- **`code`**: Machine-readable identifier. Frontend uses this for branching logic (redirect to verification, show specific field errors).
-- **`reason`**: User-facing message. Frontend can display directly. Always a complete sentence ending with a period.
+- **`code`**: Machine-readable. Clients branch on this.
+- **`message`**: Human/LLM-readable. Describes what went wrong.
+- **`retry`**: Whether retrying the same call might succeed. Only `true` for transient failures (5xx, timeouts).
 
-## Status Code Rules
+Use `canonical_error(code, message, retry=False)` from `memcp.types`.
 
-| Status | When to Use |
-|--------|-------------|
-| 200 | Successful operation that returns data |
-| 201 | Resource created |
-| 204 | Success with no body (logout, delete, disable) |
-| 400 | Client sent bad data (invalid input, bad credentials) |
-| 403 | Authenticated but forbidden (wrong password, disabled feature, insufficient role) |
-| 404 | Resource not found |
-| 409 | Conflict (duplicate resource) |
-| 429 | Too many requests (rate limit exceeded) |
-| 500 | Unexpected server error (never intentional except for genuine internal failures) |
+## Standard Codes
 
-## Adding New Error Codes
+| Code | When | Retry |
+|------|------|-------|
+| `not_found` | memory_id doesn't exist or belongs to another user | false |
+| `not_supported` | optional tool not available on this backend | false |
+| `scope_required` | delete_all called without scope keys | false |
+| `invalid_scope` | scope contains unknown keys | false |
+| `unauthorized` | invalid or missing bearer token | false |
+| `backend_error` | upstream backend returned an error | status >= 500 |
+| `validation_error` | invalid or malformed parameters | false |
+| `nested_filter` | nested boolean filters (AND/OR/NOT) attempted | false |
+| `timeout` | backend did not respond in time | true |
 
-1. Use the `{"code": "...", "reason": "..."}` format
-2. Reuse an existing code if the error is semantically identical
-3. Use `UPPER_SNAKE_CASE` for codes
-4. Write reasons as complete sentences the frontend can show to users
-5. Use appropriate HTTP status codes per the table above
+## Rules
+
+1. Every tool failure returns the canonical error object — never raw strings or exceptions
+2. `retry` is `true` only for transient failures (`e.status >= 500`)
+3. 404 from backends maps to `not_found`, not `backend_error`
+4. Validation errors are caught before backend calls
+5. `MemoryAPIError` is the only exception type tool handlers catch from backends

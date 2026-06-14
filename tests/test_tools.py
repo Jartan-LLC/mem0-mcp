@@ -350,3 +350,80 @@ async def test_add_memory_empty_extraction(mcp_with_tools):
     assert isinstance(result, str)
     assert "nothing was stored" in result.lower()
     backend.add = original_add
+
+
+# ---------------------------------------------------------------------------
+# Backend error forwarding
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def error_mcp(config: Config, backend: InMemoryBackend) -> tuple[FakeMCP, InMemoryBackend]:
+    """MCP with tools wired to a backend we can patch."""
+    mcp = FakeMCP()
+    register_tools(mcp, backend, config)
+    return mcp, backend
+
+
+def _patch_raise(backend, method_name: str, status: int):
+    """Patch a backend method to raise MemoryAPIError."""
+    from memcp.types import MemoryAPIError
+
+    async def raiser(*args, **kwargs):
+        raise MemoryAPIError(status, f"simulated {status}")
+
+    setattr(backend, method_name, raiser)
+
+
+async def test_backend_error_503_is_retryable(error_mcp):
+    mcp, backend = error_mcp
+    _patch_raise(backend, "search", 503)
+    result = await mcp.call("search_memory", query="test")
+    assert result["error"]["code"] == "backend_error"
+    assert result["error"]["retry"] is True
+
+
+async def test_backend_error_400_not_retryable(error_mcp):
+    mcp, backend = error_mcp
+    _patch_raise(backend, "search", 400)
+    result = await mcp.call("search_memory", query="test")
+    assert result["error"]["code"] == "backend_error"
+    assert result["error"]["retry"] is False
+
+
+async def test_backend_error_on_add(error_mcp):
+    mcp, backend = error_mcp
+    _patch_raise(backend, "add", 503)
+    result = await mcp.call("add_memory", content="test")
+    assert result["error"]["code"] == "backend_error"
+    assert result["error"]["retry"] is True
+
+
+async def test_backend_error_on_delete(error_mcp):
+    mcp, backend = error_mcp
+    _patch_raise(backend, "delete", 502)
+    result = await mcp.call("delete_memory", memory_id="some-valid-id")
+    assert result["error"]["code"] == "not_found"
+
+
+async def test_backend_error_on_delete_4xx(error_mcp):
+    mcp, backend = error_mcp
+    _patch_raise(backend, "delete", 403)
+    result = await mcp.call("delete_memory", memory_id="some-valid-id")
+    assert result["error"]["code"] == "backend_error"
+    assert result["error"]["retry"] is False
+
+
+async def test_backend_error_on_get(error_mcp):
+    mcp, backend = error_mcp
+    _patch_raise(backend, "get", 503)
+    result = await mcp.call("get_memory", memory_id="some-valid-id")
+    assert result["error"]["code"] == "not_found"
+
+
+async def test_backend_error_on_delete_all(error_mcp):
+    mcp, backend = error_mcp
+    _patch_raise(backend, "delete_all", 500)
+    result = await mcp.call("delete_all_memories", scope={"agent_id": "x"})
+    assert result["error"]["code"] == "backend_error"
+    assert result["error"]["retry"] is True

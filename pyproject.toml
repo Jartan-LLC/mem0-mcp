@@ -16,6 +16,9 @@ dependencies = [
     "uvicorn>=0.30",
 ]
 
+[project.scripts]
+memcp = "memcp.__main__:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",

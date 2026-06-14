@@ -18,6 +18,7 @@ from memcp.types import (
     ListResult,
     Memory,
     MemoryAPIError,
+    paginate,
 )
 
 from .base import MemoryBackend
@@ -226,16 +227,7 @@ class InMemoryBackend(MemoryBackend):
                     updated_at=entry.get("updated_at"),
                 )
             )
-        if cursor:
-            try:
-                start = int(cursor)
-            except ValueError:
-                raise MemoryAPIError(400, f"Invalid cursor: {cursor}") from None
-        else:
-            start = 0
-        page = memories[start : start + limit]
-        next_cursor = str(start + limit) if start + limit < len(memories) else None
-        return ListResult(memories=page, next_cursor=next_cursor)
+        return paginate(memories, cursor, limit)
 
     async def history(self, user_id: str, memory_id: str) -> list[HistoryEntry]:
         entry = self._store.get(memory_id)

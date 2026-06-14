@@ -20,6 +20,7 @@ from memcp.types import (
     ListResult,
     Memory,
     MemoryAPIError,
+    paginate,
     reject_nested_filters,
 )
 
@@ -96,7 +97,10 @@ class Mem0Backend(MemoryBackend):
         params: dict[str, Any] | None = None,
         json: dict[str, Any] | None = None,
     ) -> Any:
-        resp = await self._http.request(method, path, params=params, json=json)
+        try:
+            resp = await self._http.request(method, path, params=params, json=json)
+        except httpx.RequestError as e:
+            raise MemoryAPIError(503, f"Network error: {e}") from e
         if resp.status_code >= 400:
             raise MemoryAPIError(resp.status_code, resp.text)
         return resp.json() if resp.content else None
@@ -158,8 +162,12 @@ class Mem0Backend(MemoryBackend):
         return [_parse_memory(r, score=r.get("score")) for r in raw_results]
 
     async def delete(self, user_id: str, memory_id: str) -> bool:
-        result = await self._request("DELETE", f"/memories/{memory_id}")
-        return result is not None
+        # Fetch-then-verify: mem0 DELETE is global, so check ownership first
+        existing = await self.get(user_id, memory_id)
+        if existing is None:
+            raise MemoryAPIError(404, "Not found")
+        await self._request("DELETE", f"/memories/{memory_id}")
+        return True
 
     async def delete_all(self, user_id: str, scope: dict[str, Any]) -> int:
         params = _build_identifier_params(user_id, scope)
@@ -195,6 +203,8 @@ class Mem0Backend(MemoryBackend):
         result = await self._request("GET", f"/memories/{memory_id}")
         if result is None:
             return None
+        if result.get("user_id") != user_id:
+            return None
         return _parse_memory(result)
 
     async def update(
@@ -227,17 +237,7 @@ class Mem0Backend(MemoryBackend):
         result = await self._request("GET", "/memories", params=params)
         raw = result if isinstance(result, list) else (result or {}).get("results", [])
         memories = [_parse_memory(r) for r in raw]
-        # Server-side pagination shim: mem0 returns all at once
-        if cursor:
-            try:
-                start = int(cursor)
-            except ValueError:
-                raise MemoryAPIError(400, f"Invalid cursor: {cursor}") from None
-        else:
-            start = 0
-        page = memories[start : start + limit]
-        next_cursor = str(start + limit) if start + limit < len(memories) else None
-        return ListResult(memories=page, next_cursor=next_cursor)
+        return paginate(memories, cursor, limit)
 
     async def history(self, user_id: str, memory_id: str) -> list[HistoryEntry]:
         result = await self._request("GET", f"/memories/{memory_id}/history")

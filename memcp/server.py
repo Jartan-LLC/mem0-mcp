@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from mcp.server.fastmcp import FastMCP
 
 from memcp.auth import BearerGate
@@ -28,7 +30,7 @@ with the user first; delete_all_memories requires a scope.
 """
 
 
-def create_app(config: Config) -> tuple:
+def create_app(config: Config) -> tuple[Any, Mem0Backend]:
     """Build and return (asgi_app, backend) so the caller can manage shutdown."""
     mcp = FastMCP(
         "memcp",

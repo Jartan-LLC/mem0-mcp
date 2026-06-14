@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
@@ -21,8 +23,10 @@ class Config(BaseSettings):
     host: str = Field("0.0.0.0", alias="MEMCP_HOST")
     port: int = Field(8080, alias="MEMCP_PORT")
 
-    log_level: str = Field("INFO", alias="MEMCP_LOG_LEVEL")
-    log_format: str = Field("json", alias="MEMCP_LOG_FORMAT")
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
+        "INFO", alias="MEMCP_LOG_LEVEL"
+    )
+    log_format: Literal["json", "plain"] = Field("json", alias="MEMCP_LOG_FORMAT")
 
     @property
     def backend_name(self) -> str:
