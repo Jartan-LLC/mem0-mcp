@@ -1,0 +1,24 @@
+# memcp — one-command local deployment with mem0 backend
+#
+# Usage:
+#   cp .env.example .env    # fill in MEM0_API_BASE + MEM0_API_KEY
+#   docker compose up -d
+#
+# Connects to an external mem0 instance (not bundled here).
+
+services:
+  memcp:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - 8080
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
+        reservations:
+          cpus: "0.25"
+          memory: 64M

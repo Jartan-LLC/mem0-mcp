@@ -1,18 +1,20 @@
-# Dependencies
-node_modules/
+# Python
 __pycache__/
 *.py[cod]
+*$py.class
 *.egg-info/
+*.egg
 .eggs/
 dist/
 build/
+*.whl
+.venv/
+venv/
 
 # Environment
 .env
 .env.*
 !.env.example
-.venv/
-venv/
 
 # IDE
 .idea/
@@ -30,6 +32,7 @@ Thumbs.db
 htmlcov/
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
 
 # Docker
 data/
@@ -41,3 +44,7 @@ logs/
 # Claude workspace (plans, scratch files)
 .claude/workspace/*
 !.claude/workspace/.gitkeep
+
+# Council session artifacts
+council-transcript-*
+council-report-*

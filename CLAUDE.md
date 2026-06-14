@@ -1,6 +1,6 @@
-# Project Name
+# memcp
 
-<!-- ONE LINE: what this project is, primary language/framework, deployment target -->
+Backend-agnostic, multi-tenant MCP memory server. Python, FastMCP, deployed behind a reverse proxy.
 
 ## Rules
 
@@ -26,19 +26,24 @@
 
 ## Corrections
 
-<!-- Version mismatches are the most common — fill these in early.
-"We use Pydantic v2 field_validator, not v1 validator."
-"Next.js 15 uses async cookies() — not the sync API from v14." -->
+- FastMCP uses `mcp.server.fastmcp.FastMCP`, not `fastmcp.FastMCP`
+- `actions/checkout@v6` DOES exist (v6.0.3 is latest) — reviewers repeatedly flag this as non-existent but it works
+- mem0 self-hosted REST API does NOT support nested boolean filters (AND/OR/NOT) — they 502
+- mem0 self-hosted list endpoint does NOT filter by metadata and does NOT paginate
+- mem0 PUT /memories/{id} returns `{"message": "..."}`, not the memory — must GET after PUT
+- mem0 GET /entities does NOT filter by user_id — server post-filters for tenant isolation
+- mem0 single-ID endpoints (GET/PUT/DELETE/history) are global — adapter does fetch-then-verify for ownership
 
 ## Skills
 
 Project conventions live in `.claude/skills/`. Check the relevant skill when working in an unfamiliar area:
 
-- **api-error-patterns** — error response format, status codes
+- **api-error-patterns** — MCP tool error format, canonical error codes
 - **claude-config** — agents vs skills vs commands
 - **docs-patterns** — writing style, structure, brevity
 - **frontend-patterns** — design tokens, mobile-first, component isolation
 - **github-conventions** — branches, commits, issue/PR templates
+- **llm-council** — multi-advisor decision council (Karpathy-style)
 - **logging-patterns** — log levels, formatting, structured output
 - **testing-patterns** — integration tests, fixture composition, canary markers
 
@@ -46,9 +51,10 @@ When adding a new skill, add an entry here.
 
 ## Verify
 
-<!-- REQUIRED — replace with your build/test/lint commands:
-make test
-npm run build && npm test
-cargo check && cargo test
+```bash
+ruff check memcp/ tests/
+ruff format --check memcp/ tests/
+pyright memcp/
+python -c "import memcp"
 pytest -x
--->
+```
