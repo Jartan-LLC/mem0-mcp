@@ -24,6 +24,13 @@ READ_ONLY = {"readOnlyHint": True, "idempotentHint": True}
 DESTRUCTIVE = {"destructiveHint": True}
 
 
+def _backend_error(e: MemoryAPIError) -> dict[str, Any]:
+    """Map a MemoryAPIError to the appropriate canonical error."""
+    if e.status == 408:
+        return canonical_error("timeout", str(e), retry=True)
+    return canonical_error("backend_error", str(e), retry=e.status >= 500)
+
+
 def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
     """Register all MCP tools on the given server instance."""
 
@@ -50,8 +57,10 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             result = await backend.add(
                 user_id, content, scope=scope, metadata=metadata, infer=infer
             )
+        except ValueError as e:
+            return canonical_error("nested_filter", str(e))
         except MemoryAPIError as e:
-            return canonical_error("backend_error", str(e), retry=e.status >= 500)
+            return _backend_error(e)
 
         if not result:
             return (
@@ -79,8 +88,10 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             results = await backend.search(
                 user_id, query, scope=scope, limit=limit, threshold=threshold
             )
+        except ValueError as e:
+            return canonical_error("nested_filter", str(e))
         except MemoryAPIError as e:
-            return canonical_error("backend_error", str(e), retry=e.status >= 500)
+            return _backend_error(e)
 
         return {"results": [_serialize_memory(m) for m in results]}
 
@@ -100,7 +111,7 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
         except MemoryAPIError as e:
             if e.status in (404, 410):
                 return canonical_error("not_found", NOT_FOUND_MSG)
-            return canonical_error("backend_error", str(e), retry=e.status >= 500)
+            return _backend_error(e)
         return {"deleted": result}
 
     @mcp.tool(
@@ -119,8 +130,10 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             )
         try:
             count = await backend.delete_all(user_id, cleaned)
+        except ValueError as e:
+            return canonical_error("nested_filter", str(e))
         except MemoryAPIError as e:
-            return canonical_error("backend_error", str(e), retry=e.status >= 500)
+            return _backend_error(e)
         return {"deleted_count": count}
 
     @mcp.tool(
@@ -155,7 +168,7 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             except MemoryAPIError as e:
                 if e.status in (404, 410):
                     return canonical_error("not_found", NOT_FOUND_MSG)
-                return canonical_error("backend_error", str(e), retry=e.status >= 500)
+                return _backend_error(e)
             if result is None:
                 return canonical_error("not_found", NOT_FOUND_MSG)
             return _serialize_memory(result)
@@ -182,7 +195,7 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             except MemoryAPIError as e:
                 if e.status in (404, 410):
                     return canonical_error("not_found", NOT_FOUND_MSG)
-                return canonical_error("backend_error", str(e), retry=e.status >= 500)
+                return _backend_error(e)
             return _serialize_memory(result)
 
     if "list_memories" in caps:
@@ -207,7 +220,7 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             except ValueError as e:
                 return canonical_error("validation_error", str(e))
             except MemoryAPIError as e:
-                return canonical_error("backend_error", str(e), retry=e.status >= 500)
+                return _backend_error(e)
             return {
                 "memories": [_serialize_memory(m) for m in result.memories],
                 "next_cursor": result.next_cursor,
@@ -229,7 +242,7 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             except MemoryAPIError as e:
                 if e.status in (404, 410):
                     return canonical_error("not_found", NOT_FOUND_MSG)
-                return canonical_error("backend_error", str(e), retry=e.status >= 500)
+                return _backend_error(e)
             return {
                 "history": [
                     {
@@ -255,8 +268,10 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             scope = _strip_user_id(scope)
             try:
                 result = await backend.entities(user_id, scope=scope, limit=limit)
+            except ValueError as e:
+                return canonical_error("nested_filter", str(e))
             except MemoryAPIError as e:
-                return canonical_error("backend_error", str(e), retry=e.status >= 500)
+                return _backend_error(e)
             return {
                 "entities": result.entities,
                 "relationships": result.relationships,

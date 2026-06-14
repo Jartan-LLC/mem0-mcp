@@ -4,7 +4,6 @@
 .devcontainer
 .env
 .env.*
-!.env.example
 .pytest_cache
 .ruff_cache
 .mypy_cache

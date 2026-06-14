@@ -112,8 +112,12 @@ async def test_delete_wrong_user_raises(backend):
     respx.get(f"{BASE}/memories/mem-1").mock(
         return_value=httpx.Response(200, json=MEMORY_RESPONSE)
     )
+    delete_route = respx.delete(f"{BASE}/memories/mem-1").mock(
+        return_value=httpx.Response(200, json={"message": "deleted"})
+    )
     with pytest.raises(MemoryAPIError, match="Not found"):
         await backend.delete(OTHER, "mem-1")
+    assert delete_route.call_count == 0, "DELETE should never fire for wrong user"
 
 
 @respx.mock
@@ -147,7 +151,7 @@ async def test_update_fetches_after_put(backend):
 
 @respx.mock
 async def test_update_wrong_user_raises(backend):
-    respx.put(f"{BASE}/memories/mem-1").mock(
+    put_route = respx.put(f"{BASE}/memories/mem-1").mock(
         return_value=httpx.Response(200, json={"message": "updated"})
     )
     respx.get(f"{BASE}/memories/mem-1").mock(
@@ -155,6 +159,7 @@ async def test_update_wrong_user_raises(backend):
     )
     with pytest.raises(MemoryAPIError, match="not found"):
         await backend.update(OTHER, "mem-1", "hijack")
+    assert put_route.call_count == 0, "PUT should never fire for wrong user"
 
 
 # ---------------------------------------------------------------------------
@@ -243,6 +248,15 @@ async def test_network_error_raises_503(backend):
         await backend.get(USER, "mem-1")
     assert exc_info.value.status == 503
     assert "Network error" in str(exc_info.value)
+
+
+@respx.mock
+async def test_timeout_raises_408(backend):
+    respx.get(f"{BASE}/memories/mem-1").mock(side_effect=httpx.ReadTimeout("timed out"))
+    with pytest.raises(MemoryAPIError) as exc_info:
+        await backend.get(USER, "mem-1")
+    assert exc_info.value.status == 408
+    assert "Timeout" in str(exc_info.value)
 
 
 # ---------------------------------------------------------------------------

@@ -27,11 +27,12 @@ Backend-agnostic, multi-tenant MCP memory server. Python, FastMCP, deployed behi
 ## Corrections
 
 - FastMCP uses `mcp.server.fastmcp.FastMCP`, not `fastmcp.FastMCP`
+- `actions/checkout@v6` DOES exist (v6.0.3 is latest) — reviewers repeatedly flag this as non-existent but it works
 - mem0 self-hosted REST API does NOT support nested boolean filters (AND/OR/NOT) — they 502
 - mem0 self-hosted list endpoint does NOT filter by metadata and does NOT paginate
 - mem0 PUT /memories/{id} returns `{"message": "..."}`, not the memory — must GET after PUT
 - mem0 GET /entities does NOT filter by user_id — server post-filters for tenant isolation
-- mem0 single-ID endpoints (GET/DELETE) are global — adapter does fetch-then-verify for ownership
+- mem0 single-ID endpoints (GET/PUT/DELETE/history) are global — adapter does fetch-then-verify for ownership
 
 ## Skills
 
@@ -40,6 +41,7 @@ Project conventions live in `.claude/skills/`. Check the relevant skill when wor
 - **api-error-patterns** — MCP tool error format, canonical error codes
 - **claude-config** — agents vs skills vs commands
 - **docs-patterns** — writing style, structure, brevity
+- **frontend-patterns** — design tokens, mobile-first, component isolation
 - **github-conventions** — branches, commits, issue/PR templates
 - **llm-council** — multi-advisor decision council (Karpathy-style)
 - **logging-patterns** — log levels, formatting, structured output

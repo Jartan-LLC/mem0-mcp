@@ -368,6 +368,29 @@ async def test_add_memory_empty_extraction(mcp_with_tools):
 
 
 # ---------------------------------------------------------------------------
+# Nested filter rejection
+# ---------------------------------------------------------------------------
+
+
+async def test_add_memory_rejects_nested_filters(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("add_memory", content="test", scope={"AND": [{"a": 1}]})
+    assert result["error"]["code"] == "nested_filter"
+
+
+async def test_search_memory_rejects_nested_filters(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("search_memory", query="test", scope={"OR": [{"a": 1}]})
+    assert result["error"]["code"] == "nested_filter"
+
+
+async def test_delete_all_rejects_nested_filters(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("delete_all_memories", scope={"NOT": {"a": 1}, "agent_id": "x"})
+    assert result["error"]["code"] == "nested_filter"
+
+
+# ---------------------------------------------------------------------------
 # Backend error forwarding
 # ---------------------------------------------------------------------------
 
@@ -435,6 +458,14 @@ async def test_backend_error_on_delete_all(mcp_with_tools):
     _patch_raise(backend, "delete_all", 500)
     result = await mcp.call("delete_all_memories", scope={"agent_id": "x"})
     assert result["error"]["code"] == "backend_error"
+    assert result["error"]["retry"] is True
+
+
+async def test_timeout_returns_timeout_code(mcp_with_tools):
+    mcp, backend = mcp_with_tools
+    _patch_raise(backend, "search", 408)
+    result = await mcp.call("search_memory", query="test")
+    assert result["error"]["code"] == "timeout"
     assert result["error"]["retry"] is True
 
 

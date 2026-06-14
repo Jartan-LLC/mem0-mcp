@@ -100,6 +100,8 @@ class Mem0Backend(MemoryBackend):
     ) -> Any:
         try:
             resp = await self._http.request(method, path, params=params, json=json)
+        except httpx.TimeoutException as e:
+            raise MemoryAPIError(408, f"Timeout: {e}") from e
         except httpx.RequestError as e:
             raise MemoryAPIError(503, f"Network error: {e}") from e
         if resp.status_code >= 400:

@@ -19,6 +19,7 @@ from memcp.types import (
     Memory,
     MemoryAPIError,
     paginate,
+    reject_nested_filters,
 )
 
 from .base import MemoryBackend
@@ -44,6 +45,8 @@ class InMemoryBackend(MemoryBackend):
         metadata: dict[str, Any] | None = None,
         infer: bool = True,
     ) -> list[AddResult]:
+        if scope:
+            reject_nested_filters(scope)
         memory_id = str(uuid.uuid4())
         now = datetime.now(UTC).isoformat()
         self._store[memory_id] = {
@@ -73,6 +76,8 @@ class InMemoryBackend(MemoryBackend):
         limit: int = 10,
         threshold: float = 0.0,
     ) -> list[Memory]:
+        if scope:
+            reject_nested_filters(scope)
         results = []
         query_lower = query.lower()
         for mid, entry in self._store.items():
@@ -124,6 +129,7 @@ class InMemoryBackend(MemoryBackend):
         return True
 
     async def delete_all(self, user_id: str, scope: dict[str, Any]) -> int:
+        reject_nested_filters(scope)
         to_delete = []
         for mid, entry in self._store.items():
             if entry["user_id"] != user_id:
