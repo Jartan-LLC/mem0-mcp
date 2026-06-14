@@ -14,6 +14,7 @@ from starlette.routing import Mount, Route
 
 from memcp.auth import BearerGate, StaticResolver
 from memcp.backend import MemoryBackend
+from memcp.backend.in_memory import InMemoryBackend
 from memcp.backend.mem0 import Mem0Backend
 from memcp.config import Config
 from memcp.tools import register_tools
@@ -37,6 +38,16 @@ with the user first; delete_all_memories requires a scope.
 """
 
 
+def _create_backend(config: Config) -> MemoryBackend:
+    """Instantiate the configured backend."""
+    if config.memcp_backend == "in_memory":
+        return InMemoryBackend()
+    if config.memcp_backend == "mem0":
+        assert config.mem0_api_base and config.mem0_api_key
+        return Mem0Backend(config.mem0_api_base, config.mem0_api_key)
+    raise ValueError(f"Unknown backend: {config.memcp_backend}")
+
+
 def create_app(config: Config) -> tuple[Any, MemoryBackend]:
     """Build and return (asgi_app, backend)."""
     mcp = FastMCP(
@@ -47,7 +58,7 @@ def create_app(config: Config) -> tuple[Any, MemoryBackend]:
         stateless_http=True,
     )
 
-    backend = Mem0Backend(config.mem0_api_base, config.mem0_api_key)
+    backend = _create_backend(config)
     register_tools(mcp, backend, config)
 
     resolver = None

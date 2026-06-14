@@ -10,7 +10,8 @@ import pytest
 from memcp.backend.in_memory import InMemoryBackend
 from memcp.types import MemoryAPIError
 
-from .conftest import USER_A, USER_B
+USER_A = "alice"
+USER_B = "bob"
 
 # ---------------------------------------------------------------------------
 # Add + Search

@@ -29,8 +29,9 @@ pip install -e ".[dev]"
 
 | Variable | Required | Description |
 |---|---|---|
-| `MEM0_API_BASE` | Yes | Base URL of your mem0 REST API |
-| `MEM0_API_KEY` | Yes | API key for the mem0 server |
+| `MEMCP_BACKEND` | No | Backend: `mem0` (default) or `in_memory` |
+| `MEM0_API_BASE` | mem0 | Base URL of your mem0 REST API |
+| `MEM0_API_KEY` | mem0 | API key for the mem0 server |
 | `MEMCP_AUTH_TOKENS` | No | Token-to-user mapping: `tok1:alice,tok2:bob` (unset = unauthenticated) |
 | `MEMCP_HOST` | No | Bind address (default: `0.0.0.0`) |
 | `MEMCP_PORT` | No | Bind port (default: `8080`) |

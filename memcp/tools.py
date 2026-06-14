@@ -68,7 +68,7 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
         user_id = get_tenant()
         try:
             scope = _validate_scope(scope, allowed_scope_keys)
-        except _InvalidScope as e:
+        except _ScopeError as e:
             return e.error
         except ValueError as e:
             return canonical_error("nested_filter", str(e))
@@ -76,8 +76,6 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             result = await backend.add(
                 user_id, content, scope=scope, metadata=metadata, infer=infer
             )
-        except ValueError as e:
-            return canonical_error("nested_filter", str(e))
         except MemoryAPIError as e:
             return _backend_error(e)
 
@@ -112,7 +110,7 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
         user_id = get_tenant()
         try:
             scope = _validate_scope(scope, allowed_scope_keys)
-        except _InvalidScope as e:
+        except _ScopeError as e:
             return e.error
         except ValueError as e:
             return canonical_error("nested_filter", str(e))
@@ -120,8 +118,6 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             results = await backend.search(
                 user_id, query, scope=scope, limit=limit, threshold=threshold
             )
-        except ValueError as e:
-            return canonical_error("nested_filter", str(e))
         except MemoryAPIError as e:
             return _backend_error(e)
 
@@ -158,7 +154,7 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
         user_id = get_tenant()
         try:
             cleaned = _validate_scope(scope, allowed_scope_keys)
-        except _InvalidScope as e:
+        except _ScopeError as e:
             return e.error
         except ValueError as e:
             return canonical_error("nested_filter", str(e))
@@ -169,8 +165,6 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             )
         try:
             count = await backend.delete_all(user_id, cleaned)
-        except ValueError as e:
-            return canonical_error("nested_filter", str(e))
         except MemoryAPIError as e:
             return _backend_error(e)
         return {"deleted_count": count}
@@ -207,15 +201,12 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
                 result = await backend.list_memories(user_id, limit=MAX_EXPORT + 1)
             except MemoryAPIError as e:
                 return _backend_error(e)
-            if len(result.memories) > MAX_EXPORT:
-                return canonical_error(
-                    "validation_error",
-                    f"Too many memories to export (limit {MAX_EXPORT})."
-                    " Contact admin for bulk export.",
-                )
+            truncated = len(result.memories) > MAX_EXPORT
+            memories = result.memories[:MAX_EXPORT]
             return {
-                "memories": [_serialize_memory(m) for m in result.memories],
-                "count": len(result.memories),
+                "memories": [_serialize_memory(m) for m in memories],
+                "count": len(memories),
+                "truncated": truncated,
             }
 
         @mcp.tool(
@@ -237,7 +228,7 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             user_id = get_tenant()
             try:
                 scope = _validate_scope(scope, allowed_scope_keys)
-            except _InvalidScope as e:
+            except _ScopeError as e:
                 return e.error
             except ValueError as e:
                 return canonical_error("nested_filter", str(e))
@@ -350,7 +341,7 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             user_id = get_tenant()
             try:
                 scope = _validate_scope(scope, allowed_scope_keys)
-            except _InvalidScope as e:
+            except _ScopeError as e:
                 return e.error
             except ValueError as e:
                 return canonical_error("nested_filter", str(e))
@@ -369,7 +360,7 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
 # ---------------------------------------------------------------------------
 
 
-class _InvalidScope(Exception):
+class _ScopeError(Exception):
     def __init__(self, error: dict[str, Any]):
         self.error = error
 
@@ -383,26 +374,26 @@ def _validate_scope(scope: dict[str, Any] | None, allowed_keys: set[str]) -> dic
         logger.warning("Stripped user_id from scope dict; remaining keys: %s", list(scope.keys()))
     reject_nested_filters(scope)
     if len(scope) > MAX_SCOPE_KEYS:
-        raise _InvalidScope(
+        raise _ScopeError(
             canonical_error("validation_error", f"Scope has too many keys (max {MAX_SCOPE_KEYS})")
         )
     for k, v in scope.items():
         if len(k) > MAX_SCOPE_KEY_LENGTH:
-            raise _InvalidScope(
+            raise _ScopeError(
                 canonical_error(
                     "validation_error",
                     f"Scope key too long: {k!r} (max {MAX_SCOPE_KEY_LENGTH})",
                 )
             )
         if v is not None and not isinstance(v, (str, int, float, bool)):
-            raise _InvalidScope(
+            raise _ScopeError(
                 canonical_error(
                     "validation_error",
                     f"Scope value for {k!r} must be a string or number, got {type(v).__name__}",
                 )
             )
         if isinstance(v, str) and len(v) > MAX_SCOPE_VALUE_LENGTH:
-            raise _InvalidScope(
+            raise _ScopeError(
                 canonical_error(
                     "validation_error",
                     f"Scope value too long for {k!r} (max {MAX_SCOPE_VALUE_LENGTH})",
@@ -410,7 +401,7 @@ def _validate_scope(scope: dict[str, Any] | None, allowed_keys: set[str]) -> dic
             )
     unknown = set(scope) - allowed_keys
     if unknown:
-        raise _InvalidScope(
+        raise _ScopeError(
             canonical_error(
                 "invalid_scope",
                 f"Unknown scope keys: {sorted(unknown)}. Valid keys: {sorted(allowed_keys)}",

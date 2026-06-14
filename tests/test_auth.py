@@ -66,14 +66,21 @@ async def test_contextvar_isolation():
     reset_tenant(tok2)
 
 
-async def test_contextvar_default():
-    """Without set_tenant, get_tenant returns default."""
-    from memcp.auth import _tenant_var
+async def test_dev_mode_uses_default_user():
+    """BearerGate with no resolver sets default_user."""
+    from memcp.auth import _DEFAULT_USER
 
-    # Temporarily clear to test default (fixture sets test_user)
-    tok = _tenant_var.set("default_user")
-    assert get_tenant() == "default_user"
-    _tenant_var.reset(tok)
+    captured_user = None
+
+    async def capture_app(scope, receive, send):
+        nonlocal captured_user
+        captured_user = get_tenant()
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"{}"})
+
+    gate = BearerGate(capture_app, None)
+    await _make_request(gate, [])
+    assert captured_user == _DEFAULT_USER
 
 
 # ---------------------------------------------------------------------------

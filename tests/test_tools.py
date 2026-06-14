@@ -224,7 +224,7 @@ async def test_delete_all_memories_user_id_stripped(mcp_with_tools):
 async def test_memory_status(mcp_with_tools):
     mcp, _ = mcp_with_tools
     result = await mcp.call("memory_status")
-    assert result["backend"] == "mem0"
+    assert result["backend"] == "in_memory"
     assert result["version"]
     assert isinstance(result["capabilities"], list)
     assert isinstance(result["scope_keys"], list)
@@ -406,6 +406,35 @@ async def test_add_memory_rejects_unknown_scope_keys(mcp_with_tools):
     mcp, _ = mcp_with_tools
     result = await mcp.call("add_memory", content="test", scope={"bogus_key": "val"})
     assert result["error"]["code"] == "invalid_scope"
+
+
+async def test_scope_value_invalid_type_rejected(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("add_memory", content="test", scope={"agent_id": ["a", "b"]})
+    assert result["error"]["code"] == "validation_error"
+    assert "string or number" in result["error"]["message"]
+
+
+async def test_scope_too_many_keys_rejected(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    scope = {f"key_{i}": "val" for i in range(20)}
+    result = await mcp.call("add_memory", content="test", scope=scope)
+    assert result["error"]["code"] == "validation_error"
+    assert "too many" in result["error"]["message"].lower()
+
+
+async def test_scope_key_too_long_rejected(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("add_memory", content="test", scope={"a" * 100: "val"})
+    assert result["error"]["code"] == "validation_error"
+    assert "key too long" in result["error"]["message"].lower()
+
+
+async def test_scope_value_too_long_rejected(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("add_memory", content="test", scope={"agent_id": "x" * 300})
+    assert result["error"]["code"] == "validation_error"
+    assert "value too long" in result["error"]["message"].lower()
 
 
 async def test_search_rejects_unknown_scope_keys(mcp_with_tools):
@@ -685,6 +714,7 @@ async def test_export_memories_returns_all(mcp_with_tools):
     await mcp.call("add_memory", content="export three")
     result = await mcp.call("export_memories")
     assert result["count"] == 3
+    assert result["truncated"] is False
     assert len(result["memories"]) == 3
     contents = {m["content"] for m in result["memories"]}
     assert contents == {"export one", "export two", "export three"}
@@ -734,5 +764,6 @@ async def test_export_memories_over_limit(mcp_with_tools):
 
     backend.list_memories = big_list
     result = await mcp.call("export_memories")
-    assert result["error"]["code"] == "validation_error"
-    assert "limit" in result["error"]["message"].lower()
+    assert result["truncated"] is True
+    assert result["count"] == MAX_EXPORT
+    assert len(result["memories"]) == MAX_EXPORT

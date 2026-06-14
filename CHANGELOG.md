@@ -30,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Replaced single `SHIM_AUTH_TOKEN` + `MEM0_USER_ID` with `MEMCP_AUTH_TOKENS`
-- All env vars for server config prefixed with `MEMCP_`
+- Server config env vars (host, port, log, auth) prefixed with `MEMCP_`; backend vars retain `MEM0_` prefix
 
 ### Security
 - Constant-time token comparison (hmac.compare_digest)

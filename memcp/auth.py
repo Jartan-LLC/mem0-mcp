@@ -58,10 +58,11 @@ class StaticResolver:
         self._mapping = mapping
 
     async def resolve(self, token: str) -> str | None:
+        matched: str | None = None
         for known_token, user_id in self._mapping.items():
             if hmac.compare_digest(token, known_token):
-                return user_id
-        return None
+                matched = user_id
+        return matched
 
     @classmethod
     def from_env(cls, raw: str) -> StaticResolver:
