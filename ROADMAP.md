@@ -17,7 +17,6 @@ Validate the Protocol against a fundamentally different backend. mem0 and in-mem
 - [ ] Batch operations (batch_add in Protocol, backends loop by default)
 - [ ] Cross-backend migration tooling (export from one → import to another)
 - [ ] Self-contained CI docker-compose for mem0 (no API secrets needed)
-- [ ] `messages` parameter on add_memory (multi-turn conversation input, mem0-specific)
 
 **Done when:** Cognee adapter passes conformance suite. Protocol changes documented.
 
@@ -98,6 +97,7 @@ The public release. Protocol stabilization and semver guarantee.
 | Graph memory (enable_graph toggle) | v0.2 | Depends on Cognee adapter |
 | delete_entities (cascade delete) | v0.2 | Cleaner than overloading delete_all |
 | ChainResolver (JWT + static simultaneously) | v1.2 | Enterprise multi-auth |
+| `messages` param on add_memory | Unlikely | Multi-turn input is mem0-specific; breaks backend agnosticism |
 | Idempotency key on add_memory | v0.3+ | Prevent duplicate storage from retry loops |
 | Nested boolean filter support | Never unless mem0 fixes upstream | Rejected by design (502s) |
 | Server-side deduplication | Backend concern | mem0 does it, others may not |
