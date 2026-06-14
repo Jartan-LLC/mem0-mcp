@@ -82,20 +82,7 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
         except MemoryAPIError as e:
             return canonical_error("backend_error", str(e), retry=e.status >= 500)
 
-        return {
-            "results": [
-                {
-                    "id": m.id,
-                    "content": m.content,
-                    "score": m.score,
-                    "scope": m.scope,
-                    "metadata": m.metadata,
-                    "created_at": m.created_at,
-                    "updated_at": m.updated_at,
-                }
-                for m in results
-            ]
-        }
+        return {"results": [_serialize_memory(m) for m in results]}
 
     @mcp.tool(
         annotations=DESTRUCTIVE,
@@ -176,7 +163,7 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
     if "update_memory" in caps:
 
         @mcp.tool(
-            annotations={"idempotentHint": True},
+            annotations={"idempotentHint": True, "destructiveHint": True},
             description=(
                 "Replace a memory's content by memory_id. This is a full replace, not a patch."
             ),

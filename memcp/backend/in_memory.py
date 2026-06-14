@@ -251,7 +251,13 @@ class InMemoryBackend(MemoryBackend):
         scope: dict[str, Any] | None = None,
         limit: int = 100,
     ) -> EntitiesResult:
-        return EntitiesResult(entities=[], relationships=[])
+        count = sum(1 for e in self._store.values() if e["user_id"] == user_id)
+        if count == 0:
+            return EntitiesResult(entities=[], relationships=[])
+        return EntitiesResult(
+            entities=[{"id": user_id, "type": "user", "total_memories": count}],
+            relationships=[],
+        )
 
     async def close(self) -> None:
         self._store.clear()

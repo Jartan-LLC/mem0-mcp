@@ -147,10 +147,16 @@ async def test_search_memory_empty_results(mcp_with_tools):
 
 
 async def test_search_memory_strips_user_id(mcp_with_tools):
-    mcp, _ = mcp_with_tools
-    await mcp.call("add_memory", content="secret")
+    mcp, backend = mcp_with_tools
+    # Add as test_user (via tool) and separately as attacker (directly)
+    await mcp.call("add_memory", content="user secret data")
+    await backend.add("attacker", "attacker secret data")
+    # Search with user_id=attacker in scope — should be stripped,
+    # so we get test_user's data, not attacker's
     result = await mcp.call("search_memory", query="secret", scope={"user_id": "attacker"})
-    assert len(result["results"]) >= 1
+    contents = [r["content"] for r in result["results"]]
+    assert "user secret data" in contents
+    assert "attacker secret data" not in contents
 
 
 # ---------------------------------------------------------------------------
@@ -189,6 +195,11 @@ async def test_delete_all_memories_with_scope(mcp_with_tools):
     await mcp.call("add_memory", content="a2 memory", scope={"agent_id": "a2"})
     result = await mcp.call("delete_all_memories", scope={"agent_id": "a1"})
     assert "deleted_count" in result
+    # Verify target gone, non-target survived
+    remaining = await mcp.call("list_memories")
+    contents = [m["content"] for m in remaining["memories"]]
+    assert "a1 memory" not in contents
+    assert "a2 memory" in contents
 
 
 async def test_delete_all_memories_empty_scope_rejected(mcp_with_tools):
@@ -312,9 +323,13 @@ async def test_memory_history_invalid_id(mcp_with_tools):
 
 async def test_memory_entities_returns_structure(mcp_with_tools):
     mcp, _ = mcp_with_tools
+    await mcp.call("add_memory", content="entity test fact")
     result = await mcp.call("memory_entities")
     assert "entities" in result
     assert "relationships" in result
+    assert len(result["entities"]) >= 1
+    assert result["entities"][0]["id"] == "test_user"
+    assert result["entities"][0]["total_memories"] >= 1
 
 
 # ---------------------------------------------------------------------------

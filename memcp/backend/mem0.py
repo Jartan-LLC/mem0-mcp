@@ -58,6 +58,7 @@ def _build_identifier_params(
     """Query params for GET /memories and DELETE /memories."""
     params: dict[str, Any] = {"user_id": user_id}
     if scope:
+        reject_nested_filters(scope)
         for key, val in scope.items():
             val = _norm(val)
             if val is not None:
@@ -172,7 +173,7 @@ class Mem0Backend(MemoryBackend):
     async def delete_all(self, user_id: str, scope: dict[str, Any]) -> int:
         params = _build_identifier_params(user_id, scope)
         await self._request("DELETE", "/memories", params=params)
-        return -1  # mem0 doesn't return a count
+        return None  # mem0 doesn't return a count
 
     async def health(self) -> HealthStatus:
         start = time.monotonic()

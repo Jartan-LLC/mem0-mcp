@@ -13,7 +13,6 @@ __pycache__
 tests/
 council-transcript-*
 council-report-*
-council_meetings/
 
 *.md
 !README.md
