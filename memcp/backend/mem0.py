@@ -6,6 +6,7 @@ Talks to a self-hosted mem0 instance. All mem0-specific workarounds
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Any
 
@@ -19,11 +20,12 @@ from memcp.types import (
     ListResult,
     Memory,
     MemoryAPIError,
+    reject_nested_filters,
 )
 
 from .base import MemoryBackend
 
-_NESTED_FILTER_KEYS = frozenset({"AND", "OR", "NOT", "and", "or", "not"})
+logger = logging.getLogger(__name__)
 
 
 def _norm(value: Any) -> Any:
@@ -33,15 +35,6 @@ def _norm(value: Any) -> Any:
     return value
 
 
-def _reject_nested(d: dict[str, Any]) -> None:
-    bad = _NESTED_FILTER_KEYS & set(d)
-    if bad:
-        raise ValueError(
-            f"Nested boolean filters are not supported ({sorted(bad)}). "
-            "Use discrete scope keys or metadata fields instead."
-        )
-
-
 def _build_search_filters(
     user_id: str,
     scope: dict[str, Any] | None,
@@ -49,7 +42,7 @@ def _build_search_filters(
     """Flat filter dict for POST /search."""
     filters: dict[str, Any] = {"user_id": user_id}
     if scope:
-        _reject_nested(scope)
+        reject_nested_filters(scope)
         for key, val in scope.items():
             val = _norm(val) if isinstance(val, str) else val
             if val is not None:
@@ -69,21 +62,6 @@ def _build_identifier_params(
             if val is not None:
                 params[key] = val
     return params
-
-
-def _lookup_by_id(call: Any) -> Any:
-    """Run a single-id API call; map not-found signals to None.
-
-    mem0 returns 200 with null body for missing IDs and 5xx for malformed IDs.
-    Both mean "not found" to callers.
-    """
-    try:
-        result = call()
-    except MemoryAPIError as e:
-        if e.status >= 500:
-            return None
-        raise
-    return result
 
 
 def _parse_memory(raw: dict[str, Any], *, score: float | None = None) -> Memory:
@@ -109,32 +87,6 @@ class Mem0Backend(MemoryBackend):
             timeout=httpx.Timeout(timeout),
             transport=httpx.AsyncHTTPTransport(retries=3),
         )
-
-    def _request_sync(
-        self,
-        method: str,
-        path: str,
-        *,
-        params: dict[str, Any] | None = None,
-        json: dict[str, Any] | None = None,
-    ) -> Any:
-        """Synchronous request helper used inside _lookup_by_id closures."""
-        # We use a sync client for lookup_by_id patterns since they need
-        # to be called from sync closures. This will be unified in Phase 2c
-        # when all tool handlers become async.
-        import httpx as _httpx
-
-        resp = _httpx.request(
-            method,
-            f"{str(self._http.base_url).rstrip('/')}{path}",
-            params=params,
-            json=json,
-            headers={"X-API-Key": self._http.headers.get("x-api-key", "")},
-            timeout=30.0,
-        )
-        if resp.status_code >= 400:
-            raise MemoryAPIError(resp.status_code, resp.text)
-        return resp.json() if resp.content else None
 
     async def _request(
         self,
@@ -221,6 +173,7 @@ class Mem0Backend(MemoryBackend):
             latency = (time.monotonic() - start) * 1000
             return HealthStatus(status="healthy", backend="mem0", latency_ms=round(latency, 1))
         except Exception:
+            logger.warning("Health check failed", exc_info=True)
             latency = (time.monotonic() - start) * 1000
             return HealthStatus(status="unhealthy", backend="mem0", latency_ms=round(latency, 1))
 
@@ -279,7 +232,7 @@ class Mem0Backend(MemoryBackend):
             try:
                 start = int(cursor)
             except ValueError:
-                start = 0
+                raise MemoryAPIError(400, f"Invalid cursor: {cursor}") from None
         else:
             start = 0
         page = memories[start : start + limit]
@@ -309,7 +262,9 @@ class Mem0Backend(MemoryBackend):
     ) -> EntitiesResult:
         result = await self._request("GET", "/entities")
         raw = result if isinstance(result, list) else []
-        return EntitiesResult(entities=raw[:limit])
+        # mem0 /entities ignores user_id param — post-filter for tenant isolation
+        filtered = [e for e in raw if e.get("id") == user_id]
+        return EntitiesResult(entities=filtered[:limit])
 
     # --- lifecycle ---
 

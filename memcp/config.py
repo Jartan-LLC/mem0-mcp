@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
 class Config(BaseSettings):
     """Server configuration. All values come from environment variables."""
 
-    model_config = {"env_prefix": ""}
+    model_config = {"env_prefix": "", "populate_by_name": True}
 
     mem0_api_base: str
     mem0_api_key: str
@@ -16,13 +17,12 @@ class Config(BaseSettings):
     shim_auth_token: str | None = None
 
     mem0_user_id: str = "default_user"
-    mem0_default_top_k: int = 100
 
-    host: str = "0.0.0.0"
-    port: int = 8080
+    host: str = Field("0.0.0.0", alias="MEMCP_HOST")
+    port: int = Field(8080, alias="MEMCP_PORT")
 
-    log_level: str = "INFO"
-    log_format: str = "json"
+    log_level: str = Field("INFO", alias="MEMCP_LOG_LEVEL")
+    log_format: str = Field("json", alias="MEMCP_LOG_FORMAT")
 
     @property
     def backend_name(self) -> str:

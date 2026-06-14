@@ -315,3 +315,38 @@ async def test_memory_entities_returns_structure(mcp_with_tools):
     result = await mcp.call("memory_entities")
     assert "entities" in result
     assert "relationships" in result
+
+
+# ---------------------------------------------------------------------------
+# Error path coverage
+# ---------------------------------------------------------------------------
+
+
+async def test_update_memory_not_found(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("update_memory", memory_id="nonexistent-valid-id", content="x")
+    assert result["error"]["code"] == "not_found"
+
+
+async def test_memory_history_not_found(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("memory_history", memory_id="nonexistent-valid-id")
+    # in-memory backend returns empty history for unknown IDs
+    assert result["history"] == []
+
+
+async def test_add_memory_empty_extraction(mcp_with_tools):
+    """When backend returns empty results, tool returns guidance string."""
+    mcp, backend = mcp_with_tools
+
+    # Patch add to return empty (simulating infer=true extracting nothing)
+    original_add = backend.add
+
+    async def empty_add(*args, **kwargs):
+        return []
+
+    backend.add = empty_add
+    result = await mcp.call("add_memory", content="something")
+    assert isinstance(result, str)
+    assert "nothing was stored" in result.lower()
+    backend.add = original_add

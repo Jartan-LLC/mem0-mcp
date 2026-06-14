@@ -32,7 +32,9 @@ async def mem0() -> Mem0Backend:
     yield backend
     # Cleanup: delete all test user memories
     with contextlib.suppress(Exception):
-        await backend.delete_all(TEST_USER, {"user_id": TEST_USER})
+        listing = await backend.list_memories(TEST_USER)
+        for m in listing.memories:
+            await backend.delete(TEST_USER, m.id)
     await backend.close()
 
 
@@ -138,6 +140,33 @@ async def test_scope_keys(mem0: Mem0Backend):
     keys = mem0.scope_keys()
     assert "agent_id" in keys
     assert "run_id" in keys
+
+
+# ---------------------------------------------------------------------------
+# Tenant isolation
+# ---------------------------------------------------------------------------
+
+SECOND_USER = f"memcp_test2_{uuid.uuid4().hex[:8]}"
+
+
+async def test_entities_tenant_isolation(mem0: Mem0Backend):
+    """entities() should only return the requesting user's data."""
+    await mem0.add(TEST_USER, "user A entity test", infer=False)
+    await mem0.add(SECOND_USER, "user B entity test", infer=False)
+
+    result_a = await mem0.entities(TEST_USER)
+    result_b = await mem0.entities(SECOND_USER)
+
+    a_ids = {e.get("id") for e in result_a.entities}
+    b_ids = {e.get("id") for e in result_b.entities}
+
+    assert SECOND_USER not in a_ids, "User A sees User B's entities"
+    assert TEST_USER not in b_ids, "User B sees User A's entities"
+
+    # Cleanup
+    listing_b = await mem0.list_memories(SECOND_USER)
+    for m in listing_b.memories:
+        await mem0.delete(SECOND_USER, m.id)
 
 
 # ---------------------------------------------------------------------------

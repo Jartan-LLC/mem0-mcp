@@ -47,8 +47,8 @@ When adding a new skill, add an entry here.
 ## Verify
 
 ```bash
-ruff check .
-ruff format --check .
-python -m py_compile server.py
+ruff check memcp/ tests/
+ruff format --check memcp/ tests/
+python -c "import memcp"
 pytest -x
 ```

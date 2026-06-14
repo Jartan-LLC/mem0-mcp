@@ -166,9 +166,9 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             try:
                 result = await backend.get(user_id, memory_id)
             except MemoryAPIError as e:
-                if e.status >= 500:
+                if e.status in (404, 410) or e.status >= 500:
                     return canonical_error("not_found", NOT_FOUND_MSG)
-                return canonical_error("backend_error", str(e), retry=True)
+                return canonical_error("backend_error", str(e), retry=e.status >= 500)
             if result is None:
                 return canonical_error("not_found", NOT_FOUND_MSG)
             return _serialize_memory(result)
@@ -193,9 +193,9 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             try:
                 result = await backend.update(user_id, memory_id, content, metadata=metadata)
             except MemoryAPIError as e:
-                if e.status >= 500:
+                if e.status in (404, 410) or e.status >= 500:
                     return canonical_error("not_found", NOT_FOUND_MSG)
-                return canonical_error("backend_error", str(e), retry=True)
+                return canonical_error("backend_error", str(e), retry=e.status >= 500)
             return _serialize_memory(result)
 
     if "list_memories" in caps:
@@ -238,9 +238,9 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             try:
                 entries = await backend.history(user_id, memory_id)
             except MemoryAPIError as e:
-                if e.status >= 500:
+                if e.status in (404, 410) or e.status >= 500:
                     return canonical_error("not_found", NOT_FOUND_MSG)
-                return canonical_error("backend_error", str(e), retry=True)
+                return canonical_error("backend_error", str(e), retry=e.status >= 500)
             return {
                 "history": [
                     {
