@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Initial release.
 
 ### Added
-- 12 MCP tools: add_memory, search_memory, delete_memory, delete_all_memories, memory_status, export_memories, import_memories, get_memory, update_memory, list_memories, memory_history, memory_entities
+- MCP tools: add_memory, search_memory, delete_memory, delete_all_memories, memory_status, export_memories, import_memories, get_memory, update_memory, list_memories, memory_history, memory_entities
 - Backend-agnostic architecture with `MemoryBackend` Protocol
 - mem0 REST API adapter with tenant isolation (fetch-then-verify ownership)
 - In-memory backend for dev/testing (`MEMCP_BACKEND=in_memory`)

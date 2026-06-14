@@ -784,8 +784,10 @@ async def test_import_memories_basic(mcp_with_tools):
 
 
 async def test_import_memories_over_limit(mcp_with_tools):
+    from memcp.types import MAX_IMPORT
+
     mcp, _ = mcp_with_tools
-    memories = [{"content": f"mem {i}"} for i in range(1001)]
+    memories = [{"content": f"mem {i}"} for i in range(MAX_IMPORT + 1)]
     result = await mcp.call("import_memories", memories=memories)
     assert result["error"]["code"] == "validation_error"
 
@@ -861,6 +863,50 @@ async def test_import_memories_dedup_duplicate(mcp_with_tools):
     assert result["imported"] == 1
     assert result["skipped"] == 0
     assert result["results"][0]["action"] == "created"
+
+
+async def test_import_memories_within_batch_dedup(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call(
+        "import_memories",
+        memories=[{"content": "same"}, {"content": "same"}, {"content": "unique"}],
+        on_conflict="skip",
+    )
+    assert result["imported"] == 2
+    assert result["skipped"] == 1
+
+
+async def test_import_memories_unknown_scope_key_per_entry(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call(
+        "import_memories",
+        memories=[
+            {"content": "good", "scope": {"agent_id": "a1"}},
+            {"content": "bad scope", "scope": {"bogus": "val"}},
+        ],
+        on_conflict="duplicate",
+    )
+    assert result["imported"] == 1
+    assert len(result["errors"]) == 1
+    assert result["errors"][0]["index"] == 1
+
+
+async def test_import_memories_dedup_index_build_error(mcp_with_tools):
+    mcp, backend = mcp_with_tools
+    original = backend.list_memories
+
+    async def fail_list(*args, **kwargs):
+        raise MemoryAPIError(503, "backend down")
+
+    backend.list_memories = fail_list
+    result = await mcp.call(
+        "import_memories",
+        memories=[{"content": "test"}],
+        on_conflict="skip",
+    )
+    assert result["error"]["code"] == "backend_error"
+    assert result["error"]["retry"] is True
+    backend.list_memories = original
 
 
 async def test_import_memories_backend_error_per_entry(mcp_with_tools):

@@ -74,23 +74,23 @@ No external dependencies — memories are stored in-process (lost on restart). U
 
 | Tool | Description |
 |---|---|
-| `add_memory` | Store a fact/preference/decision. Extracts facts by default; `infer=false` for verbatim |
-| `search_memory` | Semantic search, ranked by relevance |
-| `delete_memory` | Delete one memory by ID (confirm first) |
-| `delete_all_memories` | Bulk-delete by scope structure, not content |
-| `memory_status` | Server version, backend type, capabilities, scope keys |
+| `add_memory` | Store a fact/preference/decision. Extracts facts by default (may store nothing); `infer=false` for verbatim. Bulk: use `import_memories` |
+| `search_memory` | Semantic search, ranked by relevance. `threshold` filters by minimum similarity (0-1). For browsing: `list_memories` |
+| `delete_memory` | Delete one memory by ID. Confirm with user first |
+| `delete_all_memories` | Bulk-delete by scope (e.g. agent_id, run_id), not content. Requires at least one scope key. Confirm first |
+| `memory_status` | Returns server version, backend type, capabilities, valid scope keys. No memory content |
 
 ### Optional (backend-dependent)
 
 | Tool | Description |
 |---|---|
-| `get_memory` | Fetch one memory by ID with full content/scope/metadata |
-| `update_memory` | Full-replace a memory's content (scope immutable) |
-| `list_memories` | Browse memories, unranked, with pagination |
-| `export_memories` | Export all memories as JSON (requires `list_memories`) |
-| `import_memories` | Batch-import from JSON with dedup (requires `list_memories`) |
-| `memory_history` | Change log: timestamps + previous/current content |
-| `memory_entities` | Knowledge graph: entities and relationships |
+| `get_memory` | Fetch one memory by ID. Returns full content, scope, and metadata |
+| `update_memory` | Full-replace a memory's content (not a patch). Scope immutable — to change scope, add new + delete old |
+| `list_memories` | Browse memories, optionally filtered by scope. Unranked, paginated. For semantic queries: `search_memory` |
+| `export_memories` | Export all memories as JSON for backup/migration. Output compatible with `import_memories` (requires `list_memories`) |
+| `import_memories` | Batch-import from JSON. Dedup against existing via exact match. `on_conflict`: skip, overwrite, duplicate (requires `list_memories`) |
+| `memory_history` | Change log for a memory: timestamps and previous/current content per create/update event |
+| `memory_entities` | Knowledge graph: entities and relationships. Not a search tool — use `search_memory` for topics |
 
 ## Docker
 
@@ -118,9 +118,12 @@ pytest -x
 - Entities endpoint does not filter by user — post-filtered client-side
 - Single-ID endpoints are globally scoped — ownership verified via fetch-then-verify
 
+**In-memory backend:**
+- Loses all data on restart
+- Search uses keyword matching, not semantic/vector similarity
+
 **General:**
 - No date/time-based filtering on search or list
-- In-memory backend loses all data on restart
 - No rate limiting (configure at reverse proxy layer)
 - `delete_all_memories` deletes by scope structure, not content match
 

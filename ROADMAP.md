@@ -98,6 +98,7 @@ The public release. Protocol stabilization and semver guarantee.
 | delete_entities (cascade delete) | v0.2 | Cleaner than overloading delete_all |
 | ChainResolver (JWT + static simultaneously) | v1.2 | Enterprise multi-auth |
 | `messages` param on add_memory | Unlikely | Multi-turn input is mem0-specific; breaks backend agnosticism |
+| In-memory backend vector search | v0.3+ | Lightweight semantic search (e.g. sentence-transformers) to replace keyword matching |
 | Idempotency key on add_memory | v0.3+ | Prevent duplicate storage from retry loops |
 | Nested boolean filter support | Never unless mem0 fixes upstream | Rejected by design (502s) |
 | Server-side deduplication | Backend concern | mem0 does it, others may not |

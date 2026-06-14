@@ -15,7 +15,6 @@ RUN adduser --disabled-password --gecos "" memcp
 
 COPY --from=build /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=build /usr/local/bin/memcp /usr/local/bin/memcp
-COPY --from=build /app/memcp /app/memcp
 
 USER memcp
 

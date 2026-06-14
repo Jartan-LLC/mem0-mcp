@@ -271,6 +271,11 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
                     "validation_error",
                     "on_conflict must be 'skip', 'overwrite', or 'duplicate'",
                 )
+            if on_conflict == "overwrite" and "update_memory" not in caps:
+                return canonical_error(
+                    "not_supported",
+                    "on_conflict='overwrite' requires update_memory capability",
+                )
 
             user_id = get_tenant()
 
@@ -289,8 +294,13 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
 
             for i, entry in enumerate(memories):
                 content = entry.get("content")
-                if not content or not isinstance(content, str) or not content.strip():
+                if not content or not isinstance(content, str):
                     errors.append({"index": i, "error": "missing or empty content"})
+                    continue
+                try:
+                    validate_content(content)
+                except ValueError as e:
+                    errors.append({"index": i, "error": str(e)})
                     continue
 
                 scope = entry.get("scope")
@@ -312,7 +322,7 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
                         await backend.update(user_id, dup_id, content, metadata=metadata)
                         imported.append({"id": dup_id, "index": i, "action": "updated"})
                     except MemoryAPIError as e:
-                        errors.append({"index": i, "error": str(e)})
+                        errors.append({"index": i, "error": f"backend error ({e.status})"})
                     continue
 
                 try:
@@ -325,7 +335,7 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
                             imported.append({"id": r.id, "index": i, "action": "created"})
                             existing[content] = r.id
                 except MemoryAPIError as e:
-                    errors.append({"index": i, "error": str(e)})
+                    errors.append({"index": i, "error": f"backend error ({e.status})"})
 
             return {
                 "imported": len(imported),
