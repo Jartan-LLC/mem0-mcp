@@ -1,0 +1,34 @@
+# memcp — one-command local deployment with mem0 backend
+#
+# Usage:
+#   cp .env.example .env    # fill in MEM0_API_BASE + MEM0_API_KEY
+#   docker compose up -d
+#
+# Connects to an external mem0 instance (not bundled here).
+
+services:
+  memcp:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${MEMCP_PORT:-8080}:8080"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8080/health',timeout=5).status==200 else 1)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
+        reservations:
+          cpus: "0.25"
+          memory: 64M

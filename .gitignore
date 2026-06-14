@@ -50,8 +50,6 @@ council-transcript-*
 council-report-*
 council_meetings/
 
-# External deployment references
-mem0_deployment_stuffs/
 
 # Local-only skills
 .claude/skills/llm-council/
