@@ -52,6 +52,7 @@ When adding a new skill, add an entry here.
 ```bash
 ruff check memcp/ tests/
 ruff format --check memcp/ tests/
+pyright memcp/
 python -c "import memcp"
 pytest -x
 ```

@@ -123,6 +123,7 @@ class Mem0Backend(MemoryBackend):
             "infer": infer,
         }
         if scope:
+            reject_nested_filters(scope)
             for key, val in scope.items():
                 normed = _norm(val)
                 if normed is not None:
@@ -170,7 +171,7 @@ class Mem0Backend(MemoryBackend):
         await self._request("DELETE", f"/memories/{memory_id}")
         return True
 
-    async def delete_all(self, user_id: str, scope: dict[str, Any]) -> int:
+    async def delete_all(self, user_id: str, scope: dict[str, Any]) -> int | None:
         params = _build_identifier_params(user_id, scope)
         await self._request("DELETE", "/memories", params=params)
         return None  # mem0 doesn't return a count
@@ -216,6 +217,10 @@ class Mem0Backend(MemoryBackend):
         *,
         metadata: dict[str, Any] | None = None,
     ) -> Memory:
+        # Fetch-then-verify: mem0 PUT is global, check ownership first
+        existing = await self.get(user_id, memory_id)
+        if existing is None:
+            raise MemoryAPIError(404, "Memory not found")
         body: dict[str, Any] = {"text": content}
         if metadata is not None:
             body["metadata"] = metadata
@@ -241,6 +246,10 @@ class Mem0Backend(MemoryBackend):
         return paginate(memories, cursor, limit)
 
     async def history(self, user_id: str, memory_id: str) -> list[HistoryEntry]:
+        # Fetch-then-verify: mem0 history endpoint is global
+        existing = await self.get(user_id, memory_id)
+        if existing is None:
+            return []
         result = await self._request("GET", f"/memories/{memory_id}/history")
         if not result:
             return []

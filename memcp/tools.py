@@ -111,14 +111,14 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
         ),
     )
     async def delete_all_memories(scope: dict[str, Any]) -> Any:
-        scope = _strip_user_id(scope)
-        if not scope:
+        cleaned = _strip_user_id(scope)
+        if not cleaned:
             return canonical_error(
                 "scope_required",
                 "delete_all_memories requires at least one scope key.",
             )
         try:
-            count = await backend.delete_all(user_id, scope)
+            count = await backend.delete_all(user_id, cleaned)
         except MemoryAPIError as e:
             return canonical_error("backend_error", str(e), retry=e.status >= 500)
         return {"deleted_count": count}

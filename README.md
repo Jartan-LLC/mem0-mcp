@@ -66,7 +66,7 @@ python -m memcp
 
 | Tool | Description |
 |---|---|
-| `add_memory` | Store a durable fact, preference, or decision |
+| `add_memory` | Store a memory (extracts facts by default; `infer=false` for verbatim) |
 | `search_memory` | Semantic search across stored memories |
 | `delete_memory` | Delete a single memory by ID |
 | `delete_all_memories` | Delete all memories within a scope |

@@ -294,6 +294,9 @@ async def test_list_memories_paginates(backend):
 
 @respx.mock
 async def test_history_parses_entries(backend):
+    respx.get(f"{BASE}/memories/mem-1").mock(
+        return_value=httpx.Response(200, json=MEMORY_RESPONSE)
+    )
     respx.get(f"{BASE}/memories/mem-1/history").mock(
         return_value=httpx.Response(
             200,
