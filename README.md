@@ -87,8 +87,8 @@ No external dependencies — memories are stored in-process (lost on restart). U
 | `get_memory` | Fetch one memory by ID with full content/scope/metadata |
 | `update_memory` | Full-replace a memory's content (scope immutable) |
 | `list_memories` | Browse memories, unranked, with pagination |
-| `export_memories` | Export all memories as JSON (compatible with import) |
-| `import_memories` | Batch-import from JSON with dedup (skip/overwrite/duplicate) |
+| `export_memories` | Export all memories as JSON (requires `list_memories`) |
+| `import_memories` | Batch-import from JSON with dedup (requires `list_memories`) |
 | `memory_history` | Change log: timestamps + previous/current content |
 | `memory_entities` | Knowledge graph: entities and relationships |
 
