@@ -68,8 +68,7 @@ def create_app(config: Config) -> tuple[Any, MemoryBackend]:
 
     # Initialize the MCP app (creates session manager)
     mcp_starlette = mcp.streamable_http_app()
-    assert mcp._session_manager is not None
-    session_manager = mcp._session_manager
+    session_manager = mcp.session_manager
 
     mcp_app = BearerGate(mcp_starlette, resolver)
 
@@ -84,8 +83,10 @@ def create_app(config: Config) -> tuple[Any, MemoryBackend]:
     @asynccontextmanager
     async def lifespan(app: Starlette) -> AsyncGenerator[None]:
         async with session_manager.run():
-            yield
-        await backend.close()
+            try:
+                yield
+            finally:
+                await backend.close()
 
     app = Starlette(
         routes=[

@@ -43,6 +43,8 @@ async def test_mcp_endpoint_responds(config: Config):
         )
 
     assert resp.status_code == 200, f"MCP init failed: {resp.status_code} {resp.text}"
+    assert "result" in resp.text
+    assert "error" not in resp.text
 
 
 async def test_mcp_endpoint_with_auth():
@@ -92,3 +94,4 @@ async def test_mcp_endpoint_with_auth():
             headers={**MCP_HEADERS, "Authorization": "Bearer testtoken"},
         )
         assert resp.status_code == 200
+        assert "result" in resp.text
