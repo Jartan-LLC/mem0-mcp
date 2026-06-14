@@ -148,6 +148,7 @@ async def test_scope_keys(mem0: Mem0Backend):
 # Tenant isolation
 # ---------------------------------------------------------------------------
 
+
 async def test_entities_tenant_isolation(mem0: Mem0Backend):
     """entities() should only return the requesting user's data."""
     await mem0.add(TEST_USER, "user A entity test", infer=False)

@@ -357,7 +357,6 @@ async def test_add_memory_empty_extraction(mcp_with_tools):
 # ---------------------------------------------------------------------------
 
 
-
 def _patch_raise(backend, method_name: str, status: int):
     """Patch a backend method to raise MemoryAPIError."""
     from memcp.types import MemoryAPIError
