@@ -44,6 +44,14 @@ pip install -e ".[dev]"
 python -m memcp
 ```
 
+### Quick start without mem0
+
+```bash
+MEMCP_BACKEND=in_memory python -m memcp
+```
+
+No external dependencies — memories are stored in-process (lost on restart). Useful for testing and development.
+
 ### Connect from Claude Code
 
 ```json
@@ -66,22 +74,23 @@ python -m memcp
 
 | Tool | Description |
 |---|---|
-| `add_memory` | Store a memory (extracts facts by default; `infer=false` for verbatim) |
-| `search_memory` | Semantic search across stored memories |
-| `delete_memory` | Delete a single memory by ID |
-| `delete_all_memories` | Delete all memories within a scope |
-| `memory_status` | Server and backend information |
+| `add_memory` | Store a fact/preference/decision. Extracts facts by default (may store nothing); `infer=false` for verbatim. Bulk: use `import_memories` |
+| `search_memory` | Semantic search, ranked by relevance. `threshold` filters by minimum similarity (0-1). For browsing: `list_memories` |
+| `delete_memory` | Delete one memory by ID. Confirm with user first |
+| `delete_all_memories` | Bulk-delete by scope (e.g. agent_id, run_id), not content. Requires at least one scope key. Confirm first |
+| `memory_status` | Returns server version, backend type, capabilities, valid scope keys. No memory content |
 
 ### Optional (backend-dependent)
 
 | Tool | Description |
 |---|---|
-| `get_memory` | Fetch a single memory by ID |
-| `update_memory` | Replace a memory's content |
-| `list_memories` | List memories, optionally scoped |
-| `export_memories` | Export all memories for backup/portability |
-| `memory_history` | Change history for a memory |
-| `memory_entities` | Extracted entities and relationships |
+| `get_memory` | Fetch one memory by ID. Returns full content, scope, and metadata |
+| `update_memory` | Full-replace a memory's content (not a patch). Scope immutable — to change scope, add new + delete old |
+| `list_memories` | Browse memories, optionally filtered by scope. Unranked, paginated. For semantic queries: `search_memory` |
+| `export_memories` | Export memories as JSON (max 10k, truncates with flag). For backup/migration. Output compatible with `import_memories` (requires `list_memories`) |
+| `import_memories` | Batch-import from JSON. Dedup via exact content match (scope-independent). `on_conflict`: skip, overwrite, duplicate (requires `list_memories`; overwrite requires `update_memory`) |
+| `memory_history` | Change log for a memory: timestamps and previous/current content per create/update event |
+| `memory_entities` | Knowledge graph: entities and relationships. Not a search tool — use `search_memory` for topics |
 
 ## Docker
 
@@ -100,9 +109,27 @@ python -c "import memcp"
 pytest -x
 ```
 
-## Pre-alpha
+## Known Limitations
 
-API will break. Not ready for production use.
+**mem0 backend (upstream constraints):**
+- Nested boolean filters (AND/OR/NOT) return 502 — use flat scope keys
+- List endpoint does not paginate server-side — full dataset loaded per request
+- List endpoint does not filter by metadata
+- Entities endpoint does not filter by user — post-filtered client-side
+- Single-ID endpoints are globally scoped — ownership verified via fetch-then-verify
+
+**In-memory backend:**
+- Loses all data on restart
+- Search uses keyword matching, not semantic/vector similarity
+
+**General:**
+- No date/time-based filtering on search or list
+- No rate limiting (configure at reverse proxy layer)
+- `delete_all_memories` deletes by scope structure, not content match
+
+## Status
+
+v0.1.0 — API may change before v1.0. Suitable for development and early adoption.
 
 ## License
 

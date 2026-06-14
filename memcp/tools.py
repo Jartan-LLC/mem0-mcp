@@ -6,7 +6,9 @@ The closure captures backend and config, eliminating module-level globals.
 
 from __future__ import annotations
 
+import functools
 import logging
+import time
 from typing import Any
 
 from memcp.auth import get_tenant
@@ -14,6 +16,7 @@ from memcp.backend import MemoryBackend
 from memcp.config import Config
 from memcp.types import (
     MAX_EXPORT,
+    MAX_IMPORT,
     MAX_SCOPE_KEY_LENGTH,
     MAX_SCOPE_KEYS,
     MAX_SCOPE_VALUE_LENGTH,
@@ -33,6 +36,36 @@ READ_ONLY = {"readOnlyHint": True, "idempotentHint": True}
 DESTRUCTIVE = {"destructiveHint": True}
 
 
+def _log_tool_call(fn: Any) -> Any:
+    """Decorator that logs tool name, duration, and status."""
+
+    @functools.wraps(fn)
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
+        start = time.monotonic()
+        try:
+            result = await fn(*args, **kwargs)
+            duration_ms = (time.monotonic() - start) * 1000
+            status = "error" if isinstance(result, dict) and "error" in result else "ok"
+            logger.info(
+                "tool=%s status=%s duration_ms=%.1f",
+                fn.__name__,
+                status,
+                duration_ms,
+            )
+            return result
+        except Exception:
+            duration_ms = (time.monotonic() - start) * 1000
+            logger.error(
+                "tool=%s status=exception duration_ms=%.1f",
+                fn.__name__,
+                duration_ms,
+                exc_info=True,
+            )
+            raise
+
+    return wrapper
+
+
 def _backend_error(e: MemoryAPIError) -> dict[str, Any]:
     """Map a MemoryAPIError to the appropriate canonical error."""
     if e.status == 408:
@@ -45,14 +78,24 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
 
     allowed_scope_keys = set(backend.scope_keys())
 
+    # Wrap mcp.tool to auto-apply request logging
+    _original_tool = mcp.tool
+
+    def _logged_tool(**kwargs: Any) -> Any:
+        def decorator(fn: Any) -> Any:
+            return _original_tool(**kwargs)(_log_tool_call(fn))
+
+        return decorator
+
+    mcp.tool = _logged_tool  # type: ignore[assignment]
+
     # --- universal tools ---
 
     @mcp.tool(
         description=(
-            "Store content in long-term memory. Use whenever a durable fact, "
-            "preference, decision, or anything worth recalling later comes up. "
-            "By default the server extracts salient facts and may store nothing "
-            "if it finds none — set infer to false to store verbatim."
+            "Store a fact/preference/decision. Extracts salient facts by "
+            "default (may store nothing); infer=false for verbatim. "
+            "Bulk: use import_memories."
         )
     )
     async def add_memory(
@@ -87,9 +130,8 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
     @mcp.tool(
         annotations=READ_ONLY,
         description=(
-            "Semantically search stored memories by meaning. Use before answering "
-            "anything that depends on what's already known about the user. "
-            "Returns memories ranked by relevance."
+            "Semantic search ranked by relevance. threshold: minimum "
+            "similarity (0-1). Unranked browsing: use list_memories."
         ),
     )
     async def search_memory(
@@ -121,9 +163,7 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
 
     @mcp.tool(
         annotations=DESTRUCTIVE,
-        description=(
-            "Delete a single memory by memory_id. Confirm with the user before deleting."
-        ),
+        description=("Delete one memory by memory_id. Confirm with user first."),
     )
     async def delete_memory(memory_id: str) -> Any:
         user_id = get_tenant()
@@ -142,8 +182,9 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
     @mcp.tool(
         annotations=DESTRUCTIVE,
         description=(
-            "Delete every memory within a given scope. Requires at least one scope "
-            "key — unscoped deletion is not allowed. Confirm with the user first."
+            "Bulk-delete memories matching a scope (e.g. agent_id, run_id). "
+            "Deletes by scope structure, not content. Requires at least one scope "
+            "key. Confirm with user first."
         ),
     )
     async def delete_all_memories(scope: dict[str, Any]) -> Any:
@@ -165,7 +206,10 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
 
     @mcp.tool(
         annotations=READ_ONLY,
-        description="Server and backend information.",
+        description=(
+            "Returns server version, backend type, capabilities, and valid "
+            "scope keys. No memory content."
+        ),
     )
     async def memory_status() -> dict[str, Any]:
         return {
@@ -184,9 +228,9 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
         @mcp.tool(
             annotations=READ_ONLY,
             description=(
-                "Export all memories for backup or portability. Returns a JSON array "
-                "of all memories. For browsing or searching, use list_memories or "
-                "search_memory instead."
+                "Export all memories as JSON. For backup/migration — output "
+                "compatible with import_memories. Browsing: list_memories; "
+                "search: search_memory."
             ),
         )
         async def export_memories() -> Any:
@@ -204,10 +248,111 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             }
 
         @mcp.tool(
+            description=(
+                "Batch-import from JSON array. Each entry needs 'content'; "
+                "optional 'scope'/'metadata'. Stored verbatim (no extraction). "
+                "Deduped by exact content match (scope-independent). "
+                "on_conflict: skip (default), overwrite, duplicate."
+            ),
+        )
+        async def import_memories(
+            memories: list[dict[str, Any]],
+            on_conflict: str = "skip",
+        ) -> Any:
+            if not memories:
+                return canonical_error("validation_error", "memories array must not be empty")
+            if len(memories) > MAX_IMPORT:
+                return canonical_error(
+                    "validation_error",
+                    f"Too many memories to import (limit {MAX_IMPORT})",
+                )
+            if on_conflict not in ("skip", "overwrite", "duplicate"):
+                return canonical_error(
+                    "validation_error",
+                    "on_conflict must be 'skip', 'overwrite', or 'duplicate'",
+                )
+            if on_conflict == "overwrite" and "update_memory" not in caps:
+                return canonical_error(
+                    "not_supported",
+                    "on_conflict='overwrite' requires update_memory capability",
+                )
+
+            user_id = get_tenant()
+
+            # Build dedup index from existing memories (capped at MAX_EXPORT;
+            # users with >10k memories get best-effort dedup)
+            existing: dict[str, str] = {}
+            if on_conflict != "duplicate":
+                try:
+                    result = await backend.list_memories(user_id, limit=MAX_EXPORT + 1)
+                    existing = {m.content: m.id for m in result.memories}
+                except MemoryAPIError as e:
+                    return _backend_error(e)
+
+            imported = []
+            skipped = []
+            errors = []
+
+            for i, entry in enumerate(memories):
+                content = entry.get("content")
+                if not isinstance(content, str):
+                    errors.append({"index": i, "error": "missing or invalid content"})
+                    continue
+                try:
+                    validate_content(content)
+                except ValueError as e:
+                    errors.append({"index": i, "error": str(e)})
+                    continue
+
+                scope = entry.get("scope")
+                if scope:
+                    try:
+                        scope = _validate_scope(scope, allowed_scope_keys)
+                    except _ScopeError as e:
+                        errors.append({"index": i, "error": e.error["error"]["message"]})
+                        continue
+                metadata = entry.get("metadata")
+                dup_id = existing.get(content)
+
+                if dup_id and on_conflict == "skip":
+                    skipped.append({"index": i, "existing_id": dup_id})
+                    continue
+
+                if dup_id and on_conflict == "overwrite":
+                    try:
+                        await backend.update(user_id, dup_id, content, metadata=metadata)
+                        imported.append({"id": dup_id, "index": i, "action": "updated"})
+                    except MemoryAPIError as e:
+                        errors.append({"index": i, "error": str(e)})
+                    continue
+
+                try:
+                    result = await backend.add(
+                        user_id, content, scope=scope, metadata=metadata, infer=False
+                    )
+                    if result:
+                        items = result if isinstance(result, list) else [result]
+                        for r in items:
+                            imported.append({"id": r.id, "index": i, "action": "created"})
+                            existing[content] = r.id
+                    else:
+                        errors.append({"index": i, "error": "stored nothing"})
+                except MemoryAPIError as e:
+                    errors.append({"index": i, "error": str(e)})
+
+            return {
+                "imported": len(imported),
+                "skipped": len(skipped),
+                "errors": errors,
+                "results": imported,
+                "skipped_details": skipped,
+            }
+
+        @mcp.tool(
             annotations=READ_ONLY,
             description=(
-                "List stored memories, optionally scoped. For finding something "
-                "specific, prefer search_memory."
+                "Browse memories, optionally filtered by scope. Unranked, "
+                "paginated. Semantic queries: use search_memory."
             ),
         )
         async def list_memories(
@@ -241,7 +386,7 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
 
         @mcp.tool(
             annotations=READ_ONLY,
-            description="Fetch a single memory by its memory_id.",
+            description="Fetch a single memory by ID. Returns full content, scope, and metadata.",
         )
         async def get_memory(memory_id: str) -> Any:
             user_id = get_tenant()
@@ -264,7 +409,8 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
         @mcp.tool(
             annotations={"idempotentHint": True, "destructiveHint": True},
             description=(
-                "Replace a memory's content by memory_id. This is a full replace, not a patch."
+                "Full-replace a memory's content by memory_id (not a patch). "
+                "Scope is immutable — to change scope, add new + delete old."
             ),
         )
         async def update_memory(
@@ -290,7 +436,10 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
 
         @mcp.tool(
             annotations=READ_ONLY,
-            description="Change history for a single memory by memory_id.",
+            description=(
+                "Change log for a memory: timestamps and previous/current "
+                "content per create/update event."
+            ),
         )
         async def memory_history(memory_id: str) -> Any:
             user_id = get_tenant()
@@ -320,7 +469,10 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
 
         @mcp.tool(
             annotations=READ_ONLY,
-            description="Extracted entities and relationships from stored memories.",
+            description=(
+                "Knowledge graph: entities and relationships from memories. "
+                "Not a search tool — use search_memory for topics."
+            ),
         )
         async def memory_entities(
             scope: dict[str, Any] | None = None,

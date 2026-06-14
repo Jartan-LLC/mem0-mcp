@@ -14,6 +14,7 @@ import pytest
 from memcp.backend.in_memory import InMemoryBackend
 from memcp.config import Config
 from memcp.tools import register_tools
+from memcp.types import MemoryAPIError
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -26,7 +27,7 @@ class FakeMCP:
     def __init__(self) -> None:
         self._tools: dict[str, Any] = {}
 
-    def tool(self, description: str = "", annotations: dict | None = None):
+    def tool(self, **kwargs: Any):
         def decorator(fn):
             self._tools[fn.__name__] = fn
             return fn
@@ -74,6 +75,7 @@ async def test_optional_tools_registered(mcp_with_tools):
         "memory_history",
         "memory_entities",
         "export_memories",
+        "import_memories",
     }
     assert optional <= mcp.tool_names
 
@@ -760,6 +762,271 @@ async def test_query_too_long_rejected(mcp_with_tools):
     result = await mcp.call("search_memory", query="x" * 10_001)
     assert result["error"]["code"] == "validation_error"
     assert "maximum" in result["error"]["message"]
+
+
+# ---------------------------------------------------------------------------
+# import_memories
+# ---------------------------------------------------------------------------
+
+
+async def test_import_memories_basic(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    memories = [
+        {"content": "fact one"},
+        {"content": "fact two", "scope": {"agent_id": "a1"}},
+        {"content": "fact three", "metadata": {"source": "test"}},
+    ]
+    result = await mcp.call("import_memories", memories=memories)
+    assert result["imported"] == 3
+    assert len(result["results"]) == 3
+    assert result["errors"] == []
+    assert result["skipped"] == 0
+
+
+async def test_import_memories_over_limit(mcp_with_tools):
+    from memcp.types import MAX_IMPORT
+
+    mcp, _ = mcp_with_tools
+    memories = [{"content": f"mem {i}"} for i in range(MAX_IMPORT + 1)]
+    result = await mcp.call("import_memories", memories=memories)
+    assert result["error"]["code"] == "validation_error"
+
+
+async def test_import_memories_empty_rejected(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("import_memories", memories=[])
+    assert result["error"]["code"] == "validation_error"
+
+
+async def test_import_memories_invalid_on_conflict(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("import_memories", memories=[{"content": "x"}], on_conflict="bad")
+    assert result["error"]["code"] == "validation_error"
+    assert "on_conflict" in result["error"]["message"]
+
+
+async def test_import_memories_skips_bad_entries(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    memories = [
+        {"content": "good"},
+        {"content": ""},
+        {"content": "   "},
+        {"no_content": True},
+        {"content": 42},
+        {"content": "also good"},
+    ]
+    result = await mcp.call("import_memories", memories=memories)
+    assert result["imported"] == 2
+    assert len(result["errors"]) == 4
+
+
+async def test_import_memories_stores_verbatim(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("import_memories", memories=[{"content": "exact text"}])
+    assert result["imported"] == 1
+    search = await mcp.call("search_memory", query="exact text")
+    assert any(r["content"] == "exact text" for r in search["results"])
+
+
+async def test_import_memories_dedup_skip(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    await mcp.call("add_memory", content="existing fact", infer=False)
+    result = await mcp.call(
+        "import_memories",
+        memories=[{"content": "existing fact"}, {"content": "new fact"}],
+        on_conflict="skip",
+    )
+    assert result["imported"] == 1
+    assert result["skipped"] == 1
+    assert result["skipped_details"][0]["existing_id"]
+
+
+async def test_import_memories_dedup_overwrite(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    await mcp.call("add_memory", content="existing fact", infer=False)
+    result = await mcp.call(
+        "import_memories",
+        memories=[{"content": "existing fact", "metadata": {"updated": True}}],
+        on_conflict="overwrite",
+    )
+    assert result["imported"] == 1
+    assert result["results"][0]["action"] == "updated"
+
+
+async def test_import_memories_dedup_duplicate(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    await mcp.call("add_memory", content="existing fact", infer=False)
+    result = await mcp.call(
+        "import_memories",
+        memories=[{"content": "existing fact"}],
+        on_conflict="duplicate",
+    )
+    assert result["imported"] == 1
+    assert result["skipped"] == 0
+    assert result["results"][0]["action"] == "created"
+
+
+async def test_import_memories_within_batch_dedup(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call(
+        "import_memories",
+        memories=[{"content": "same"}, {"content": "same"}, {"content": "unique"}],
+        on_conflict="skip",
+    )
+    assert result["imported"] == 2
+    assert result["skipped"] == 1
+
+
+async def test_import_memories_overwrite_creates_new(mcp_with_tools):
+    """on_conflict=overwrite with no existing match creates new memory."""
+    mcp, _ = mcp_with_tools
+    result = await mcp.call(
+        "import_memories",
+        memories=[{"content": "brand new"}],
+        on_conflict="overwrite",
+    )
+    assert result["imported"] == 1
+    assert result["results"][0]["action"] == "created"
+
+
+async def test_import_memories_dedup_ignores_scope(mcp_with_tools):
+    """Same content in different scope is treated as duplicate (content-only dedup)."""
+    mcp, _ = mcp_with_tools
+    await mcp.call("add_memory", content="shared fact", scope={"agent_id": "a1"}, infer=False)
+    result = await mcp.call(
+        "import_memories",
+        memories=[{"content": "shared fact", "scope": {"agent_id": "a2"}}],
+        on_conflict="skip",
+    )
+    assert result["imported"] == 0
+    assert result["skipped"] == 1
+
+
+async def test_import_memories_unknown_scope_key_per_entry(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call(
+        "import_memories",
+        memories=[
+            {"content": "good", "scope": {"agent_id": "a1"}},
+            {"content": "bad scope", "scope": {"bogus": "val"}},
+        ],
+        on_conflict="duplicate",
+    )
+    assert result["imported"] == 1
+    assert len(result["errors"]) == 1
+    assert result["errors"][0]["index"] == 1
+
+
+async def test_import_memories_dedup_index_build_error(mcp_with_tools):
+    mcp, backend = mcp_with_tools
+    original = backend.list_memories
+
+    async def fail_list(*args, **kwargs):
+        raise MemoryAPIError(503, "backend down")
+
+    backend.list_memories = fail_list
+    result = await mcp.call(
+        "import_memories",
+        memories=[{"content": "test"}],
+        on_conflict="skip",
+    )
+    assert result["error"]["code"] == "backend_error"
+    assert result["error"]["retry"] is True
+    backend.list_memories = original
+
+
+async def test_import_memories_backend_error_per_entry(mcp_with_tools):
+    mcp, backend = mcp_with_tools
+    original_add = backend.add
+
+    call_count = 0
+
+    async def failing_add(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 2:
+            raise MemoryAPIError(503, "backend down")
+        return await original_add(*args, **kwargs)
+
+    backend.add = failing_add
+    result = await mcp.call(
+        "import_memories",
+        memories=[{"content": "one"}, {"content": "two"}, {"content": "three"}],
+        on_conflict="duplicate",
+    )
+    assert result["imported"] == 2
+    assert len(result["errors"]) == 1
+    assert result["errors"][0]["index"] == 1
+    backend.add = original_add
+
+
+async def test_import_memories_overwrite_update_error(mcp_with_tools):
+    mcp, backend = mcp_with_tools
+    await mcp.call("add_memory", content="existing", infer=False)
+    original = backend.update
+
+    async def fail_update(*args, **kwargs):
+        raise MemoryAPIError(503, "update failed")
+
+    backend.update = fail_update
+    result = await mcp.call(
+        "import_memories",
+        memories=[{"content": "existing"}],
+        on_conflict="overwrite",
+    )
+    assert result["imported"] == 0
+    assert len(result["errors"]) == 1
+    backend.update = original
+
+
+async def test_import_memories_overwrite_requires_capability(config):
+    """overwrite rejected when backend lacks update_memory capability."""
+    from memcp.backend.in_memory import InMemoryBackend
+
+    class NoUpdateBackend(InMemoryBackend):
+        def capabilities(self):
+            return super().capabilities() - {"update_memory"}
+
+    backend = NoUpdateBackend()
+    mcp = FakeMCP()
+    register_tools(mcp, backend, config)
+    result = await mcp.call(
+        "import_memories",
+        memories=[{"content": "test"}],
+        on_conflict="overwrite",
+    )
+    assert result["error"]["code"] == "not_supported"
+
+
+async def test_import_memories_scope_injection_stripped(mcp_with_tools):
+    """user_id in per-entry scope is stripped, memory stored for real tenant."""
+    mcp, backend = mcp_with_tools
+    result = await mcp.call(
+        "import_memories",
+        memories=[{"content": "attack data", "scope": {"user_id": "victim"}}],
+        on_conflict="duplicate",
+    )
+    assert result["imported"] == 1
+    # Verify stored for test_user, not victim
+    listing = await backend.list_memories("test_user")
+    assert any(m.content == "attack data" for m in listing.memories)
+    victim = await backend.list_memories("victim")
+    assert len(victim.memories) == 0
+
+
+async def test_import_memories_tenant_isolation(mcp_with_tools):
+    from memcp.auth import reset_tenant, set_tenant
+
+    mcp, _ = mcp_with_tools
+
+    tok = set_tenant("importer")
+    await mcp.call("import_memories", memories=[{"content": "imported data"}])
+    reset_tenant(tok)
+
+    tok = set_tenant("other_user")
+    search = await mcp.call("search_memory", query="imported data")
+    assert len(search["results"]) == 0
+    reset_tenant(tok)
 
 
 # ---------------------------------------------------------------------------

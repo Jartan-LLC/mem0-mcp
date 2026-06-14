@@ -1,13 +1,22 @@
-FROM python:3.14-slim AS base
+ARG PYTHON_VERSION=3.12
+
+FROM python:${PYTHON_VERSION}-slim AS build
 
 WORKDIR /app
-
-RUN adduser --disabled-password --gecos "" memcp
 
 COPY pyproject.toml README.md ./
 COPY memcp/ memcp/
 
 RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir .
+
+FROM python:${PYTHON_VERSION}-slim
+
+WORKDIR /app
+
+RUN adduser --disabled-password --gecos "" memcp
+
+COPY --from=build /usr/local/lib /usr/local/lib
+COPY --from=build /usr/local/bin/memcp /usr/local/bin/memcp
 
 USER memcp
 
