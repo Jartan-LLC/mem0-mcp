@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from memcp.backend.in_memory import InMemoryBackend
 from memcp.config import Config
 
 
@@ -16,3 +17,12 @@ def config() -> Config:
         shim_auth_token="test-token",
         mem0_user_id="test_user",
     )
+
+
+@pytest.fixture
+def backend() -> InMemoryBackend:
+    return InMemoryBackend()
+
+
+USER_A = "alice"
+USER_B = "bob"
