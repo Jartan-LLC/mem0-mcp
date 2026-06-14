@@ -255,10 +255,12 @@ class Mem0Backend(MemoryBackend):
         body: dict[str, Any] = {"text": content}
         if metadata is not None:
             body["metadata"] = metadata
-        result = await self._request("PUT", f"/memories/{memory_id}", json=body)
-        if result is None:
+        await self._request("PUT", f"/memories/{memory_id}", json=body)
+        # mem0 PUT returns {"message": "..."}, not the memory. Fetch it.
+        updated = await self.get(user_id, memory_id)
+        if updated is None:
             raise MemoryAPIError(404, "Memory not found")
-        return _parse_memory(result)
+        return updated
 
     async def list_memories(
         self,
