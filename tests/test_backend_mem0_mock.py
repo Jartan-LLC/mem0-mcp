@@ -336,3 +336,16 @@ async def test_history_parses_entries(backend):
     assert len(entries) == 2
     assert entries[0].action == "add"
     assert entries[1].content_before == "original"
+
+
+@respx.mock
+async def test_history_wrong_user_raises(backend):
+    respx.get(f"{BASE}/memories/mem-1").mock(
+        return_value=httpx.Response(200, json=MEMORY_RESPONSE)
+    )
+    history_route = respx.get(f"{BASE}/memories/mem-1/history").mock(
+        return_value=httpx.Response(200, json=[])
+    )
+    with pytest.raises(MemoryAPIError, match="Not found"):
+        await backend.history(OTHER, "mem-1")
+    assert history_route.call_count == 0, "History endpoint should not be called for wrong user"

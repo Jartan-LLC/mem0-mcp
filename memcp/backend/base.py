@@ -93,7 +93,11 @@ class MemoryBackend(ABC):
         raise NotImplementedError
 
     async def history(self, user_id: str, memory_id: str) -> list[HistoryEntry]:
-        """Raises MemoryAPIError(404) if not found or not owned by user_id."""
+        """Raises MemoryAPIError(404) if not found or not owned by user_id.
+
+        Note: action strings are backend-specific (e.g. "created"/"updated" vs
+        "add"/"update"). Normalize in v0.2 when the Protocol stabilizes.
+        """
         raise NotImplementedError
 
     async def entities(

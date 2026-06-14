@@ -29,7 +29,7 @@ def main() -> None:
     try:
         app, _backend = create_app(config)
     except ValueError as e:
-        print(f"Configuration error:\n{e}", file=sys.stderr)
+        logger.critical("Configuration error: %s", e)
         raise SystemExit(1) from None
     uvicorn.run(app, host=config.host, port=config.port, log_config=None)
 
