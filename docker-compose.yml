@@ -10,7 +10,7 @@ services:
   memcp:
     build: .
     # Or use a pre-built image instead of building from source:
-    # image: ghcr.io/jartan-llc/mem0-mcp:0.1.0
+    # image: ghcr.io/jartan-llc/mem0-mcp:latest
     restart: unless-stopped
     env_file:
       - .env
