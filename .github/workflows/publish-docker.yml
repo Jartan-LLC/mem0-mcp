@@ -23,16 +23,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract version from tag
-        id: version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+      - name: Extract version and repo
+        id: meta
+        run: |
+          echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          echo "repo=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
       - uses: docker/build-push-action@v7
         with:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
-            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.version }}
+            ghcr.io/${{ steps.meta.outputs.repo }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
