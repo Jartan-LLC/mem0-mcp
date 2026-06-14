@@ -119,7 +119,7 @@ async def test_history(mem0: Mem0Backend):
 
     entries = await mem0.history(TEST_USER, memory_id)
     assert len(entries) >= 1
-    assert entries[0].action in ("ADD", "created")
+    assert entries[0].action in ("add", "created")
 
     await mem0.delete(TEST_USER, memory_id)
 

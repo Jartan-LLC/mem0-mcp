@@ -195,6 +195,7 @@ async def test_delete_all_memories_with_scope(mcp_with_tools):
     await mcp.call("add_memory", content="a2 memory", scope={"agent_id": "a2"})
     result = await mcp.call("delete_all_memories", scope={"agent_id": "a1"})
     assert "deleted_count" in result
+    assert result["deleted_count"] == 1
     # Verify target gone, non-target survived
     remaining = await mcp.call("list_memories")
     contents = [m["content"] for m in remaining["memories"]]
@@ -284,6 +285,12 @@ async def test_list_memories_returns_all(mcp_with_tools):
     await mcp.call("add_memory", content="two")
     result = await mcp.call("list_memories")
     assert len(result["memories"]) == 2
+
+
+async def test_list_memories_invalid_cursor(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("list_memories", cursor="not-a-number")
+    assert result["error"]["code"] == "validation_error"
 
 
 async def test_list_memories_with_scope(mcp_with_tools):
@@ -388,6 +395,30 @@ async def test_delete_all_rejects_nested_filters(mcp_with_tools):
     mcp, _ = mcp_with_tools
     result = await mcp.call("delete_all_memories", scope={"NOT": {"a": 1}, "agent_id": "x"})
     assert result["error"]["code"] == "nested_filter"
+
+
+# ---------------------------------------------------------------------------
+# Invalid scope keys
+# ---------------------------------------------------------------------------
+
+
+async def test_add_memory_rejects_unknown_scope_keys(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("add_memory", content="test", scope={"bogus_key": "val"})
+    assert result["error"]["code"] == "invalid_scope"
+
+
+async def test_search_rejects_unknown_scope_keys(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    result = await mcp.call("search_memory", query="test", scope={"bad": "val"})
+    assert result["error"]["code"] == "invalid_scope"
+
+
+async def test_valid_scope_keys_pass(mcp_with_tools):
+    mcp, _ = mcp_with_tools
+    await mcp.call("add_memory", content="scoped", scope={"agent_id": "a1"})
+    result = await mcp.call("search_memory", query="scoped", scope={"agent_id": "a1"})
+    assert len(result["results"]) >= 1
 
 
 # ---------------------------------------------------------------------------

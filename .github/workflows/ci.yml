@@ -17,9 +17,10 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install ruff
+      - run: pip install -e ".[dev]"
       - run: ruff check memcp/ tests/
       - run: ruff format --check memcp/ tests/
+      - run: pyright memcp/
 
   test:
     runs-on: ubuntu-latest

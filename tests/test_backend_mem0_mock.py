@@ -332,5 +332,5 @@ async def test_history_parses_entries(backend):
     )
     entries = await backend.history(USER, "mem-1")
     assert len(entries) == 2
-    assert entries[0].action == "ADD"
+    assert entries[0].action == "add"
     assert entries[1].content_before == "original"

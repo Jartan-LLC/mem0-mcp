@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -36,7 +38,7 @@ with the user first; delete_all_memories requires a scope.
 
 
 def create_app(config: Config) -> tuple[Any, MemoryBackend]:
-    """Build and return (asgi_app, backend) so the caller can manage shutdown."""
+    """Build and return (asgi_app, backend)."""
     mcp = FastMCP(
         "memcp",
         instructions=INSTRUCTIONS,
@@ -58,11 +60,17 @@ def create_app(config: Config) -> tuple[Any, MemoryBackend]:
             status_code=code,
         )
 
+    @asynccontextmanager
+    async def lifespan(app: Starlette) -> AsyncGenerator[None]:
+        yield
+        await backend.close()
+
     app = Starlette(
         routes=[
             Route("/health", health),
             Mount("/", app=mcp_app),
         ],
+        lifespan=lifespan,
     )
 
     return app, backend

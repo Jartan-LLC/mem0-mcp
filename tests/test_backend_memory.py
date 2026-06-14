@@ -179,6 +179,9 @@ async def test_list_memories_pagination(backend: InMemoryBackend):
     assert page1.next_cursor is not None
     page2 = await backend.list_memories(USER_A, limit=2, cursor=page1.next_cursor)
     assert len(page2.memories) == 2
+    page1_ids = {m.id for m in page1.memories}
+    page2_ids = {m.id for m in page2.memories}
+    assert page1_ids.isdisjoint(page2_ids), "Pages should not overlap"
 
 
 # ---------------------------------------------------------------------------

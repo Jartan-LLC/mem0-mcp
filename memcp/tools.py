@@ -35,6 +35,7 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
     """Register all MCP tools on the given server instance."""
 
     user_id = config.mem0_user_id
+    allowed_scope_keys = set(backend.scope_keys())
 
     # --- universal tools ---
 
@@ -52,7 +53,12 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
         metadata: dict[str, Any] | None = None,
         infer: bool = True,
     ) -> Any:
-        scope = _strip_user_id(scope)
+        try:
+            scope = _validate_scope(scope, allowed_scope_keys)
+        except _InvalidScope as e:
+            return e.error
+        except ValueError as e:
+            return canonical_error("nested_filter", str(e))
         try:
             result = await backend.add(
                 user_id, content, scope=scope, metadata=metadata, infer=infer
@@ -83,7 +89,12 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
         limit: int = 10,
         threshold: float = 0.0,
     ) -> Any:
-        scope = _strip_user_id(scope)
+        try:
+            scope = _validate_scope(scope, allowed_scope_keys)
+        except _InvalidScope as e:
+            return e.error
+        except ValueError as e:
+            return canonical_error("nested_filter", str(e))
         try:
             results = await backend.search(
                 user_id, query, scope=scope, limit=limit, threshold=threshold
@@ -122,7 +133,12 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
         ),
     )
     async def delete_all_memories(scope: dict[str, Any]) -> Any:
-        cleaned = _strip_user_id(scope)
+        try:
+            cleaned = _validate_scope(scope, allowed_scope_keys)
+        except _InvalidScope as e:
+            return e.error
+        except ValueError as e:
+            return canonical_error("nested_filter", str(e))
         if not cleaned:
             return canonical_error(
                 "scope_required",
@@ -212,7 +228,12 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             limit: int = 100,
             cursor: str | None = None,
         ) -> Any:
-            scope = _strip_user_id(scope)
+            try:
+                scope = _validate_scope(scope, allowed_scope_keys)
+            except _InvalidScope as e:
+                return e.error
+            except ValueError as e:
+                return canonical_error("nested_filter", str(e))
             try:
                 result = await backend.list_memories(
                     user_id, scope=scope, limit=limit, cursor=cursor
@@ -265,7 +286,10 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
             scope: dict[str, Any] | None = None,
             limit: int = 100,
         ) -> Any:
-            scope = _strip_user_id(scope)
+            try:
+                scope = _validate_scope(scope, allowed_scope_keys)
+            except _InvalidScope as e:
+                return e.error
             try:
                 result = await backend.entities(user_id, scope=scope, limit=limit)
             except ValueError as e:
@@ -283,11 +307,29 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _strip_user_id(scope: dict[str, Any] | None) -> dict[str, Any] | None:
-    """Security invariant: remove user_id from scope dicts."""
-    if scope and "user_id" in scope:
-        logger.warning("Stripped user_id from scope dict (security invariant)")
+class _InvalidScope(Exception):
+    def __init__(self, error: dict[str, Any]):
+        self.error = error
+
+
+def _validate_scope(scope: dict[str, Any] | None, allowed_keys: set[str]) -> dict[str, Any] | None:
+    """Strip user_id, reject nested filters, validate scope keys."""
+    if not scope:
+        return scope
+    if "user_id" in scope:
+        logger.warning("Stripped user_id from scope dict; remaining keys: %s", list(scope.keys()))
         scope = {k: v for k, v in scope.items() if k != "user_id"}
+    from memcp.types import reject_nested_filters
+
+    reject_nested_filters(scope)
+    unknown = set(scope) - allowed_keys
+    if unknown:
+        raise _InvalidScope(
+            canonical_error(
+                "invalid_scope",
+                f"Unknown scope keys: {sorted(unknown)}. Valid keys: {sorted(allowed_keys)}",
+            )
+        )
     return scope
 
 

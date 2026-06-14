@@ -7,7 +7,7 @@ RUN adduser --disabled-password --gecos "" memcp
 COPY pyproject.toml README.md ./
 COPY memcp/ memcp/
 
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir .
 
 USER memcp
 

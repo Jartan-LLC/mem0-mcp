@@ -257,7 +257,7 @@ class Mem0Backend(MemoryBackend):
             return []
         return [
             HistoryEntry(
-                action=entry.get("event", "unknown"),
+                action=entry.get("event", "unknown").lower(),
                 timestamp=entry.get("created_at", ""),
                 content_before=entry.get("old_memory"),
                 content_after=entry.get("new_memory"),
