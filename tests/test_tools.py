@@ -812,11 +812,12 @@ async def test_import_memories_skips_bad_entries(mcp_with_tools):
         {"content": ""},
         {"content": "   "},
         {"no_content": True},
+        {"content": 42},
         {"content": "also good"},
     ]
     result = await mcp.call("import_memories", memories=memories)
     assert result["imported"] == 2
-    assert len(result["errors"]) == 3
+    assert len(result["errors"]) == 4
 
 
 async def test_import_memories_stores_verbatim(mcp_with_tools):
@@ -873,6 +874,31 @@ async def test_import_memories_within_batch_dedup(mcp_with_tools):
         on_conflict="skip",
     )
     assert result["imported"] == 2
+    assert result["skipped"] == 1
+
+
+async def test_import_memories_overwrite_creates_new(mcp_with_tools):
+    """on_conflict=overwrite with no existing match creates new memory."""
+    mcp, _ = mcp_with_tools
+    result = await mcp.call(
+        "import_memories",
+        memories=[{"content": "brand new"}],
+        on_conflict="overwrite",
+    )
+    assert result["imported"] == 1
+    assert result["results"][0]["action"] == "created"
+
+
+async def test_import_memories_dedup_ignores_scope(mcp_with_tools):
+    """Same content in different scope is treated as duplicate (content-only dedup)."""
+    mcp, _ = mcp_with_tools
+    await mcp.call("add_memory", content="shared fact", scope={"agent_id": "a1"}, infer=False)
+    result = await mcp.call(
+        "import_memories",
+        memories=[{"content": "shared fact", "scope": {"agent_id": "a2"}}],
+        on_conflict="skip",
+    )
+    assert result["imported"] == 0
     assert result["skipped"] == 1
 
 

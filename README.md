@@ -87,7 +87,7 @@ No external dependencies — memories are stored in-process (lost on restart). U
 | `get_memory` | Fetch one memory by ID. Returns full content, scope, and metadata |
 | `update_memory` | Full-replace a memory's content (not a patch). Scope immutable — to change scope, add new + delete old |
 | `list_memories` | Browse memories, optionally filtered by scope. Unranked, paginated. For semantic queries: `search_memory` |
-| `export_memories` | Export all memories as JSON for backup/migration. Output compatible with `import_memories` (requires `list_memories`) |
+| `export_memories` | Export memories as JSON (max 10k, truncates with flag). For backup/migration. Output compatible with `import_memories` (requires `list_memories`) |
 | `import_memories` | Batch-import from JSON. Dedup via exact content match (scope-independent). `on_conflict`: skip, overwrite, duplicate (requires `list_memories`; overwrite requires `update_memory`) |
 | `memory_history` | Change log for a memory: timestamps and previous/current content per create/update event |
 | `memory_entities` | Knowledge graph: entities and relationships. Not a search tool — use `search_memory` for topics |

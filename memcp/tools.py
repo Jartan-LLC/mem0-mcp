@@ -335,6 +335,8 @@ def register_tools(mcp: Any, backend: MemoryBackend, config: Config) -> None:
                         for r in items:
                             imported.append({"id": r.id, "index": i, "action": "created"})
                             existing[content] = r.id
+                    else:
+                        errors.append({"index": i, "error": "stored nothing"})
                 except MemoryAPIError as e:
                     errors.append({"index": i, "error": str(e)})
 

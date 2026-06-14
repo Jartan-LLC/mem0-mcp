@@ -28,3 +28,5 @@ Initial release.
 - PyPI and Docker image publish workflows (on tag push)
 - Backend selection via `MEMCP_BACKEND` (mem0, in_memory)
 - Server config: `MEMCP_HOST`, `MEMCP_PORT`, `MEMCP_LOG_LEVEL`, `MEMCP_LOG_FORMAT`
+
+[0.1.0]: https://github.com/Jartan-LLC/mem0-mcp/releases/tag/v0.1.0
