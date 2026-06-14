@@ -66,22 +66,23 @@ python -m memcp
 
 | Tool | Description |
 |---|---|
-| `add_memory` | Store a memory (extracts facts by default; `infer=false` for verbatim) |
-| `search_memory` | Semantic search across stored memories |
-| `delete_memory` | Delete a single memory by ID |
-| `delete_all_memories` | Delete all memories within a scope |
-| `memory_status` | Server and backend information |
+| `add_memory` | Store a fact/preference/decision. Extracts facts by default; `infer=false` for verbatim |
+| `search_memory` | Semantic search, ranked by relevance |
+| `delete_memory` | Delete one memory by ID (confirm first) |
+| `delete_all_memories` | Bulk-delete by scope structure, not content |
+| `memory_status` | Server version, backend type, capabilities, scope keys |
 
 ### Optional (backend-dependent)
 
 | Tool | Description |
 |---|---|
-| `get_memory` | Fetch a single memory by ID |
-| `update_memory` | Replace a memory's content |
-| `list_memories` | List memories, optionally scoped |
-| `export_memories` | Export all memories for backup/portability |
-| `memory_history` | Change history for a memory |
-| `memory_entities` | Extracted entities and relationships |
+| `get_memory` | Fetch one memory by ID with full content/scope/metadata |
+| `update_memory` | Full-replace a memory's content (scope immutable) |
+| `list_memories` | Browse memories, unranked, with pagination |
+| `export_memories` | Export all memories as JSON (compatible with import) |
+| `import_memories` | Batch-import from JSON with dedup (skip/overwrite/duplicate) |
+| `memory_history` | Change log: timestamps + previous/current content |
+| `memory_entities` | Knowledge graph: entities and relationships |
 
 ## Docker
 

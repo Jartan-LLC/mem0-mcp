@@ -14,7 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multi-tenant auth via `MEMCP_AUTH_TOKENS` (token:user_id mapping)
 - Resolver Protocol for pluggable auth backends
 - Per-request tenant identity via contextvars
-- MCP tools: add_memory, search_memory, delete_memory, delete_all_memories, memory_status, export_memories, get_memory, update_memory, list_memories, memory_history, memory_entities
+- MCP tools: add_memory, search_memory, delete_memory, delete_all_memories, memory_status, export_memories, import_memories, get_memory, update_memory, list_memories, memory_history, memory_entities
+- Import with dedup and conflict resolution (skip/overwrite/duplicate)
 - Scope key validation against backend-declared keys
 - Input validation (content length, query length, limit min/max, threshold range, scope size/types, whitespace rejection)
 - Nested boolean filter rejection with canonical error
@@ -23,12 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `/health` endpoint (pings backend, returns 200/503)
 - Structured JSON/plain logging with tenant context
 - Log injection protection in plain formatter
-- Dockerfile + docker-compose for deployment
+- Request-level logging (tool name, duration, status per call)
+- Multi-stage Dockerfile + docker-compose for deployment
 - CI pipeline (ruff, pyright, pytest, Docker build + health check)
 - PyPI + Docker image publish workflows
 - Test suite: conformance, tool layer, auth, mock adapter, tenant isolation, integration
 - Backend selection via `MEMCP_BACKEND` (mem0, in_memory)
 - Server config: `MEMCP_HOST`, `MEMCP_PORT`, `MEMCP_LOG_LEVEL`, `MEMCP_LOG_FORMAT`
+- LLM-optimized tool descriptions for accurate tool selection
 
 ### Security
 - Constant-time token comparison (hmac.compare_digest)
